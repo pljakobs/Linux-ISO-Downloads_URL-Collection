@@ -9,10 +9,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 # URL of the GitHub raw text file
-ISO_LIST_URL = "https://raw.githubusercontent.com/pljakobs/Linux-ISO-Downloads_URL-Collection/main/LINUX-ISO-DOWNLOAD-LINKS.txt"
+ISO_LIST_URL = "https://raw.githubusercontent.com/pljakobs/Linux-ISO-Downloads_URL-Collection/main/README.md"
 REPO_HTTPS_URL = "https://github.com/pljakobs/Linux-ISO-Downloads_URL-Collection.git"
 REPO_SSH_URL = "git@github.com:pljakobs/Linux-ISO-Downloads_URL-Collection.git"
-REPO_FILE_PATH = "LINUX-ISO-DOWNLOAD-LINKS.txt"
+REPO_FILE_PATH = "README.md"
 
 # Global variable to store selections
 selected_urls = []
