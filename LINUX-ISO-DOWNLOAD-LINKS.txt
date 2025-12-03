@@ -249,8 +249,40 @@ This repository is provided for informational purposes and adheres to the licens
 
 ## Fedora
 
-### Workstation
-- [Fedora 43 Workstation](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Workstation/x86_64/iso/Fedora-Workstation-Live-43-1.6.x86_64.iso)
+### Fedora 43 Workstation
+- [Fedora-Workstation-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Workstation/x86_64/iso/Fedora-Workstation-Live-43-1.6.x86_64.iso)
+
+### Fedora 43 Spins
+- [Budgie](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Budgie-Live-43-1.6.x86_64.iso)
+- [COSMIC](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-COSMIC-Live-43-1.6.x86_64.iso)
+- [Cinnamon](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-43-1.6.iso)
+- [KDE](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-KDE-Mobile-Live-43-1.6.x86_64.iso)
+- [LXDE](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-LXDE-Live-x86_64-43-1.6.iso)
+- [LXQt](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-LXQt-Live-43-1.6.x86_64.iso)
+- [MATE_Compiz](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-MATE_Compiz-Live-x86_64-43-1.6.iso)
+- [MiracleWM](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-MiracleWM-Live-43-1.6.x86_64.iso)
+- [SoaS](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-SoaS-Live-43-1.6.x86_64.iso)
+- [Sway](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Sway-Live-x86_64-43-1.6.iso)
+- [Xfce](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Xfce-Live-43-1.6.x86_64.iso)
+- [i3](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-i3-Live-43-1.6.x86_64.iso)
+
+### Fedora 42 Workstation
+- [Fedora-Workstation-Live-42-1.1.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso)
+
+### Fedora 42 Spins
+- [Budgie](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Budgie-Live-42-1.1.x86_64.iso)
+- [COSMIC](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-COSMIC-Live-42-1.1.x86_64.iso)
+- [Cinnamon](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso)
+- [KDE](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-KDE-Mobile-Live-42-1.1.x86_64.iso)
+- [LXDE](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-LXDE-Live-x86_64-42-1.1.iso)
+- [LXQt](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-LXQt-Live-42-1.1.x86_64.iso)
+- [MATE_Compiz](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-MATE_Compiz-Live-x86_64-42-1.1.iso)
+- [MiracleWM](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-MiracleWM-Live-42-1.1.x86_64.iso)
+- [SoaS](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-SoaS-Live-42-1.1.x86_64.iso)
+- [Sway](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Sway-Live-x86_64-42-1.1.iso)
+- [Xfce](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso)
+- [i3](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-i3-Live-x86_64-42-1.1.iso)
+
 
 ### Spins
 - [Fedora 43 Budgie](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Budgie-Live-43-1.6.x86_64.iso)
