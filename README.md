@@ -47,8 +47,8 @@
 - [BackBox 8.1](https://backbox.mirror.garr.it/backbox-8.1-desktop-amd64.iso)
 
 ## MX Linux
-- [MX-23.3 AHS](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-23.3_ahs_x64.iso)
-- [MX-23.3](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-23.3_x64.iso)
+- [MX-17.1 AHS](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-17.1_ahs_x64.iso)
+- [MX-17.1](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-17.1_x64.iso)
 
 ## Caine
 - [Caine 13.0](https://mirror.0x.sg/parrot/iso/caine/caine13.0.iso)
