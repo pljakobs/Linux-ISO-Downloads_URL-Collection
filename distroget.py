@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 from updaters import DISTRO_UPDATERS
+import datetime
 
 # URL of the GitHub raw text file
 ISO_LIST_URL = "https://raw.githubusercontent.com/pljakobs/Linux-ISO-Downloads_URL-Collection/main/README.md"
@@ -91,6 +92,15 @@ def fetch_distrowatch_versions():
         print(f"Warning: Could not fetch DistroWatch versions: {e}")
         return {}
 
+def validate_url(url, timeout=5):
+    """Check if a URL exists using HEAD request."""
+    try:
+        r = requests.head(url, timeout=timeout, allow_redirects=True)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
 def update_iso_list_file(local_repo_path):
     """Update the ISO list file with latest versions from various sources."""
     file_path = Path(local_repo_path) / REPO_FILE_PATH
@@ -104,6 +114,30 @@ def update_iso_list_file(local_repo_path):
     
     original_content = content
     changes_made = []
+    
+    # Update auto-update status section at the top
+    auto_update_section = "## Auto-Updated Distributions\n\n"
+    auto_update_section += "The following distributions are automatically updated with the latest versions:\n\n"
+    for distro_name in sorted(DISTRO_UPDATERS.keys()):
+        auto_update_section += f"- ✓ {distro_name}\n"
+    auto_update_section += f"\n*Last update check: {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*\n\n"
+    auto_update_section += "---\n\n"
+    
+    # Check if auto-update section exists
+    if "## Auto-Updated Distributions" in content:
+        # Update existing section
+        import re
+        pattern = r'## Auto-Updated Distributions.*?(?=\n##[^#]|\Z)'
+        content = re.sub(pattern, auto_update_section.rstrip() + '\n\n', content, flags=re.DOTALL)
+    else:
+        # Add section after any leading comments/title but before first ## header
+        import re
+        match = re.search(r'^(.*?)(## [^#])', content, re.DOTALL)
+        if match:
+            content = match.group(1) + auto_update_section + match.group(2) + content[match.end():]
+        else:
+            # No headers found, add at the beginning
+            content = auto_update_section + content
     
     # Update each distro
     for distro_name, updater_class in DISTRO_UPDATERS.items():
@@ -121,6 +155,43 @@ def update_iso_list_file(local_repo_path):
                 links = updater_class.generate_download_links(version)
                 
                 if links:
+                    # Validate URLs
+                    print("  Validating URLs...")
+                    validated = 0
+                    total = 0
+                    
+                    # Extract URLs from links structure
+                    urls_to_check = []
+                    if isinstance(links, dict):
+                        for key, value in links.items():
+                            if isinstance(value, list):
+                                for url in value:
+                                    if isinstance(url, str) and url.startswith('http'):
+                                        urls_to_check.append(url)
+                                    elif isinstance(url, str):
+                                        # Extract URL from markdown format
+                                        import re
+                                        match = re.search(r'\(([^)]+)\)', url)
+                                        if match:
+                                            urls_to_check.append(match.group(1))
+                    elif isinstance(links, list):
+                        for link in links:
+                            # Extract URL from markdown format
+                            import re
+                            match = re.search(r'\(([^)]+)\)', link)
+                            if match:
+                                urls_to_check.append(match.group(1))
+                    
+                    # Validate a sample of URLs (up to 3 to avoid too many requests)
+                    sample_urls = urls_to_check[:min(3, len(urls_to_check))]
+                    for url in sample_urls:
+                        if validate_url(url):
+                            validated += 1
+                        total += 1
+                    
+                    if total > 0:
+                        print(f"  Validated {validated}/{total} URLs (sample)")
+                    
                     # Count links differently for hierarchical structures
                     if isinstance(links, dict):
                         total_links = sum(len(v) if isinstance(v, list) else sum(len(sv) for sv in v.values() if isinstance(sv, list)) 
@@ -129,7 +200,10 @@ def update_iso_list_file(local_repo_path):
                     else:
                         print(f"  Generated {len(links)} download link(s)")
                     
-                    content = updater_class.update_section(content, version, links)
+                    # Add metadata: auto-update marker and timestamp
+                    current_time = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+                    content = updater_class.update_section(content, version, links, 
+                                                          metadata={'auto_updated': True, 'last_updated': current_time})
                     
                     if isinstance(version, list):
                         changes_made.append(f"{distro_name} {', '.join(version)}")

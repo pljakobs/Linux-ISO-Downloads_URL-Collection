@@ -19,9 +19,60 @@ class DistroUpdater:
         raise NotImplementedError
     
     @staticmethod
-    def update_section(content, version, links):
-        """Update the distro's section in the markdown content."""
+    def update_section(content, version, links, metadata=None):
+        """
+        Update the distro's section in the markdown content.
+        
+        Args:
+            content: The markdown content
+            version: Version number(s)
+            links: Generated download links
+            metadata: Optional dict with 'auto_updated' and 'last_updated' keys
+        """
         raise NotImplementedError
+    
+    @staticmethod
+    def add_metadata_comment(section_content, metadata):
+        """Add metadata as HTML comment at the start of section."""
+        if metadata and metadata.get('auto_updated'):
+            comment = f"<!-- Auto-updated: {metadata.get('last_updated', 'N/A')} -->\n"
+            return comment + section_content
+        return section_content
+
+
+def get_distrowatch_version(distro_name):
+    """
+    Generic scraper to get version from DistroWatch.
+    
+    Args:
+        distro_name: The distro identifier on DistroWatch (e.g., 'mx', 'kali', 'mint')
+    
+    Returns:
+        Version string or None
+    """
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0'
+        }
+        r = requests.get(f'https://distrowatch.com/table.php?distribution={distro_name}', 
+                        headers=headers, timeout=10)
+        r.raise_for_status()
+        
+        # Pattern 1: Look for "DistroName X.Y.Z" or "DistroName X.Y"
+        # This is flexible and works for most distros
+        patterns = [
+            rf'{distro_name}[- ](\d+\.\d+(?:\.\d+)?)',  # lowercase with hyphen or space
+            r'>(\d+\.\d+(?:\.\d+)?)<',  # Version in tags (common in version column)
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, r.text, re.IGNORECASE)
+            if match:
+                return match.group(1)
+    except Exception as e:
+        print(f"    Error fetching {distro_name} from DistroWatch: {e}")
+    
+    return None
 
 
 class FedoraUpdater(DistroUpdater):
@@ -93,7 +144,7 @@ class FedoraUpdater(DistroUpdater):
         return structure
     
     @staticmethod
-    def update_section(content, versions, structure):
+    def update_section(content, versions, structure, metadata=None):
         """Update Fedora section with hierarchical markdown."""
         # Find any existing Fedora section (Fedora or Fedora Workstation)
         # Match only top-level ## sections (not ### subsections)
@@ -217,7 +268,7 @@ class DebianUpdater(DistroUpdater):
         return structure
     
     @staticmethod
-    def update_section(content, versions, structure):
+    def update_section(content, versions, structure, metadata=None):
         """Update Debian section with hierarchical desktop environments."""
         pattern = r'## Debian\s*\n(.*?)(?=\n## [^#]|\Z)'
         
@@ -324,7 +375,7 @@ class UbuntuUpdater(DistroUpdater):
         return structure
     
     @staticmethod
-    def update_section(content, versions, structure):
+    def update_section(content, versions, structure, metadata=None):
         """Update Ubuntu section with hierarchical flavors."""
         pattern = r'## Ubuntu\s*\n(.*?)(?=\n## [^#]|\Z)'
         
@@ -410,7 +461,7 @@ class OpenSUSEUpdater(DistroUpdater):
         return structure
     
     @staticmethod
-    def update_section(content, versions, structure):
+    def update_section(content, versions, structure, metadata=None):
         """Update openSUSE section."""
         pattern = r'## openSUSE\s*\n(.*?)(?=\n## [^#]|\Z)'
         
@@ -474,12 +525,13 @@ class LinuxMintUpdater(DistroUpdater):
         return links
     
     @staticmethod
-    def update_section(content, version, links):
+    def update_section(content, version, links, metadata=None):
         """Update Linux Mint section."""
         if not links:
             return content
         
         section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
         pattern = r'(## Linux Mint\s*\n)(.*?)(?=\n## [^#]|\Z)'
         replacement = f'\\1{section_content}\n'
         content = re.sub(pattern, replacement, content, flags=re.DOTALL)
@@ -516,12 +568,13 @@ class ArchLinuxUpdater(DistroUpdater):
         return [f"- [Arch Linux {version}]({url})"]
     
     @staticmethod
-    def update_section(content, version, links):
+    def update_section(content, version, links, metadata=None):
         """Update Arch Linux section."""
         if not links:
             return content
         
         section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
         pattern = r'(## Arch Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
         replacement = f'\\1{section_content}\n'
         content = re.sub(pattern, replacement, content, flags=re.DOTALL)
@@ -535,18 +588,7 @@ class MXLinuxUpdater(DistroUpdater):
     @staticmethod
     def get_latest_version():
         """Get latest MX Linux version."""
-        try:
-            r = requests.get('https://mxlinux.org/download-links/', timeout=10)
-            r.raise_for_status()
-            
-            # Find version like "MX-25"
-            match = re.search(r'MX-(\d+)', r.text)
-            if match:
-                return match.group(1)
-        except Exception as e:
-            print(f"    Error fetching MX Linux version: {e}")
-        
-        return None
+        return get_distrowatch_version('mx')
     
     @staticmethod
     def generate_download_links(version):
@@ -564,12 +606,13 @@ class MXLinuxUpdater(DistroUpdater):
         return links
     
     @staticmethod
-    def update_section(content, version, links):
+    def update_section(content, version, links, metadata=None):
         """Update MX Linux section."""
         if not links:
             return content
         
         section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
         pattern = r'(## MX Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
         replacement = f'\\1{section_content}\n'
         content = re.sub(pattern, replacement, content, flags=re.DOTALL)
@@ -618,12 +661,13 @@ class KaliLinuxUpdater(DistroUpdater):
         return links
     
     @staticmethod
-    def update_section(content, version, links):
+    def update_section(content, version, links, metadata=None):
         """Update Kali Linux section."""
         if not links:
             return content
         
         section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
         pattern = r'(## Kali Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
         replacement = f'\\1{section_content}\n'
         content = re.sub(pattern, replacement, content, flags=re.DOTALL)
@@ -662,12 +706,13 @@ class PopOSUpdater(DistroUpdater):
         return [f"- [Pop!_OS {version}]({url})"]
     
     @staticmethod
-    def update_section(content, version, links):
+    def update_section(content, version, links, metadata=None):
         """Update Pop!_OS section."""
         if not links:
             return content
         
         section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
         pattern = r'(## Pop!_OS\s*\n)(.*?)(?=\n## [^#]|\Z)'
         replacement = f'\\1{section_content}\n'
         content = re.sub(pattern, replacement, content, flags=re.DOTALL)
@@ -708,13 +753,161 @@ class AlpineLinuxUpdater(DistroUpdater):
         return [f"- [Alpine {version}]({url})"]
     
     @staticmethod
-    def update_section(content, version, links):
+    def update_section(content, version, links, metadata=None):
         """Update Alpine Linux section."""
         if not links:
             return content
         
         section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
         pattern = r'(## Alpine Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
+        replacement = f'\\1{section_content}\n'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
+        return content
+
+
+class ManjaroUpdater(DistroUpdater):
+    """Updater for Manjaro."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Manjaro version."""
+        # Manjaro is rolling release, use date from their download page
+        try:
+            r = requests.get('https://manjaro.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find ISO filenames with versions like "manjaro-xfce-24.1.2"
+            match = re.search(r'manjaro-\w+-(\d+\.\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Manjaro version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Manjaro download links."""
+        if not version:
+            return []
+        
+        links = []
+        base_url = "https://download.manjaro.org"
+        editions = ['xfce', 'kde', 'gnome']
+        
+        for edition in editions:
+            # Manjaro uses format: edition/version/manjaro-edition-version-kernel.iso
+            # Use minimal notation as kernel version varies
+            url = f"{base_url}/{edition}/{version}/manjaro-{edition}-{version}-minimal-x86_64.iso"
+            links.append(f"- [{edition.upper()} {version}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Manjaro section."""
+        if not links:
+            return content
+        
+        section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
+        pattern = r'(## Manjaro\s*\n)(.*?)(?=\n## [^#]|\Z)'
+        replacement = f'\\1{section_content}\n'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
+        return content
+
+
+class EndeavourOSUpdater(DistroUpdater):
+    """Updater for EndeavourOS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest EndeavourOS version."""
+        try:
+            r = requests.get('https://endeavouros.com/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "EndeavourOS_Ganymede-2025.11.24"
+            match = re.search(r'EndeavourOS[_-]\w+-(\d{4}\.\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching EndeavourOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate EndeavourOS download link."""
+        if not version:
+            return []
+        
+        # EndeavourOS typically has one main ISO
+        url = f"https://github.com/endeavouros-team/ISO/releases/latest/download/EndeavourOS_{version}.iso"
+        return [f"- [EndeavourOS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update EndeavourOS section."""
+        if not links:
+            return content
+        
+        section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
+        pattern = r'(## EndeavourOS\s*\n)(.*?)(?=\n## [^#]|\Z)'
+        replacement = f'\\1{section_content}\n'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
+        return content
+
+
+class ZorinOSUpdater(DistroUpdater):
+    """Updater for Zorin OS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Zorin OS version."""
+        try:
+            r = requests.get('https://zorin.com/os/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "Zorin OS 18"
+            match = re.search(r'Zorin OS (\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Zorin OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Zorin OS download links."""
+        if not version:
+            return []
+        
+        links = []
+        # Zorin OS editions on SourceForge
+        editions = [('Core', 'Core'), ('Lite', 'Lite')]
+        
+        for name, edition in editions:
+            url = f"https://sourceforge.net/projects/zorin-os/files/{version}/Zorin-OS-{version}-{edition}-64-bit.iso"
+            links.append(f"- [{name} {version}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Zorin OS section."""
+        if not links:
+            return content
+        
+        section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
+        pattern = r'(## Zorin OS\s*\n)(.*?)(?=\n## [^#]|\Z)'
         replacement = f'\\1{section_content}\n'
         content = re.sub(pattern, replacement, content, flags=re.DOTALL)
         
@@ -733,4 +926,7 @@ DISTRO_UPDATERS = {
     'Kali Linux': KaliLinuxUpdater,
     'Pop!_OS': PopOSUpdater,
     'Alpine Linux': AlpineLinuxUpdater,
+    'Manjaro': ManjaroUpdater,
+    'EndeavourOS': EndeavourOSUpdater,
+    'Zorin OS': ZorinOSUpdater,
 }
