@@ -104,11 +104,17 @@ class FedoraUpdater(DistroUpdater):
         if not versions or not isinstance(versions, list):
             return []
         
-        # Structure: {version: {'Workstation': [urls], 'Spins': [urls]}}
+        # Structure: {version: {'Workstation': [urls], 'Server': [urls], 'Spins': [urls], 'Silverblue': [urls]}}
         structure = {}
         
         for version_num in versions:
-            structure[version_num] = {'Workstation': [], 'Spins': []}
+            structure[version_num] = {
+                'Workstation': [], 
+                'Server': [],
+                'Spins': [],
+                'Silverblue': [],
+                'Kinoite': []
+            }
             
             # Get Workstation edition
             try:
@@ -123,6 +129,48 @@ class FedoraUpdater(DistroUpdater):
                     structure[version_num]['Workstation'].append(f"{workstation_url}/{matches[0]}")
             except Exception as e:
                 print(f"    Warning: Could not fetch Fedora {version_num} Workstation: {e}")
+            
+            # Get Server edition
+            try:
+                server_url = f"https://download.fedoraproject.org/pub/fedora/linux/releases/{version_num}/Server/x86_64/iso"
+                r = requests.get(server_url + "/", timeout=10, allow_redirects=True)
+                r.raise_for_status()
+                
+                # Find Server ISOs
+                iso_pattern = re.compile(r'href="(Fedora-Server[^"]*\.iso)"')
+                matches = iso_pattern.findall(r.text)
+                for iso in sorted(set(matches)):
+                    structure[version_num]['Server'].append(f"{server_url}/{iso}")
+            except Exception as e:
+                print(f"    Warning: Could not fetch Fedora {version_num} Server: {e}")
+            
+            # Get Silverblue edition
+            try:
+                silverblue_url = f"https://download.fedoraproject.org/pub/fedora/linux/releases/{version_num}/Silverblue/x86_64/iso"
+                r = requests.get(silverblue_url + "/", timeout=10, allow_redirects=True)
+                r.raise_for_status()
+                
+                # Find Silverblue ISO
+                iso_pattern = re.compile(r'href="(Fedora-Silverblue[^"]*\.iso)"')
+                matches = iso_pattern.findall(r.text)
+                if matches:
+                    structure[version_num]['Silverblue'].append(f"{silverblue_url}/{matches[0]}")
+            except Exception as e:
+                print(f"    Warning: Could not fetch Fedora {version_num} Silverblue: {e}")
+            
+            # Get Kinoite edition
+            try:
+                kinoite_url = f"https://download.fedoraproject.org/pub/fedora/linux/releases/{version_num}/Kinoite/x86_64/iso"
+                r = requests.get(kinoite_url + "/", timeout=10, allow_redirects=True)
+                r.raise_for_status()
+                
+                # Find Kinoite ISO
+                iso_pattern = re.compile(r'href="(Fedora-Kinoite[^"]*\.iso)"')
+                matches = iso_pattern.findall(r.text)
+                if matches:
+                    structure[version_num]['Kinoite'].append(f"{kinoite_url}/{matches[0]}")
+            except Exception as e:
+                print(f"    Warning: Could not fetch Fedora {version_num} Kinoite: {e}")
             
             # Get all Spins
             try:
@@ -140,6 +188,37 @@ class FedoraUpdater(DistroUpdater):
                     
             except Exception as e:
                 print(f"    Warning: Could not fetch Fedora {version_num} Spins: {e}")
+        
+        # Add CoreOS (version-independent, always latest)
+        structure['CoreOS'] = {'Stable': []}
+        try:
+            coreos_url = "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds"
+            r = requests.get(coreos_url + "/builds.json", timeout=10)
+            r.raise_for_status()
+            import json
+            builds = json.loads(r.text)
+            if 'builds' in builds and builds['builds']:
+                latest_build = builds['builds'][0]
+                build_id = latest_build['id']
+                iso_url = f"https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/{build_id}/x86_64/fedora-coreos-{build_id}-live.x86_64.iso"
+                structure['CoreOS']['Stable'].append(iso_url)
+        except Exception as e:
+            print(f"    Warning: Could not fetch Fedora CoreOS: {e}")
+        
+        # Add Rawhide (development version, always latest)
+        structure['Rawhide'] = {'Development': []}
+        try:
+            rawhide_url = "https://download.fedoraproject.org/pub/fedora/linux/development/rawhide/Workstation/x86_64/iso"
+            r = requests.get(rawhide_url + "/", timeout=10, allow_redirects=True)
+            r.raise_for_status()
+            
+            # Find Rawhide Workstation ISO
+            iso_pattern = re.compile(r'href="(Fedora-Workstation-Live[^"]*\.iso)"')
+            matches = iso_pattern.findall(r.text)
+            if matches:
+                structure['Rawhide']['Development'].append(f"{rawhide_url}/{matches[0]}")
+        except Exception as e:
+            print(f"    Warning: Could not fetch Fedora Rawhide: {e}")
         
         return structure
     
@@ -167,6 +246,30 @@ class FedoraUpdater(DistroUpdater):
                         new_section += f"- [{filename}]({url})\n"
                     new_section += "\n"
                 
+                # Add Server subsection
+                if version_data.get('Server'):
+                    new_section += f"### Fedora {version} Server\n"
+                    for url in version_data['Server']:
+                        filename = url.split('/')[-1]
+                        new_section += f"- [{filename}]({url})\n"
+                    new_section += "\n"
+                
+                # Add Silverblue subsection
+                if version_data.get('Silverblue'):
+                    new_section += f"### Fedora {version} Silverblue\n"
+                    for url in version_data['Silverblue']:
+                        filename = url.split('/')[-1]
+                        new_section += f"- [{filename}]({url})\n"
+                    new_section += "\n"
+                
+                # Add Kinoite subsection
+                if version_data.get('Kinoite'):
+                    new_section += f"### Fedora {version} Kinoite\n"
+                    for url in version_data['Kinoite']:
+                        filename = url.split('/')[-1]
+                        new_section += f"- [{filename}]({url})\n"
+                    new_section += "\n"
+                
                 # Add Spins subsection
                 if version_data.get('Spins'):
                     new_section += f"### Fedora {version} Spins\n"
@@ -177,6 +280,22 @@ class FedoraUpdater(DistroUpdater):
                         spin_name = match.group(1) if match else filename
                         new_section += f"- [{spin_name}]({url})\n"
                     new_section += "\n"
+            
+            # Add CoreOS section
+            if 'CoreOS' in structure and structure['CoreOS'].get('Stable'):
+                new_section += "### Fedora CoreOS\n"
+                for url in structure['CoreOS']['Stable']:
+                    filename = url.split('/')[-1]
+                    new_section += f"- [{filename}]({url})\n"
+                new_section += "\n"
+            
+            # Add Rawhide section
+            if 'Rawhide' in structure and structure['Rawhide'].get('Development'):
+                new_section += "### Fedora Rawhide (Development)\n"
+                for url in structure['Rawhide']['Development']:
+                    filename = url.split('/')[-1]
+                    new_section += f"- [{filename}]({url})\n"
+                new_section += "\n"
             
             if re.search(pattern, content, re.DOTALL):
                 content = re.sub(pattern, new_section, content, flags=re.DOTALL)

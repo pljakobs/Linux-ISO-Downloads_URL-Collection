@@ -300,6 +300,13 @@ class DownloadManager:
         self.lock = threading.Lock()
         self.workers = []
         self.running = True
+        self.temp_dir = None
+        self.downloaded_files = []  # Track files for bulk transfer
+        
+        # Setup temp directory for remote downloads
+        if self.is_remote:
+            import tempfile
+            self.temp_dir = tempfile.mkdtemp(prefix='distroget_')
         
     def start(self):
         """Start download worker threads."""
@@ -353,12 +360,8 @@ class DownloadManager:
     
     def _download_file(self, url, filename):
         """Download a single file."""
-        import tempfile
-        import subprocess
-        
         if self.is_remote:
-            temp_dir = tempfile.gettempdir()
-            local_path = os.path.join(temp_dir, filename)
+            local_path = os.path.join(self.temp_dir, filename)
         else:
             local_path = os.path.join(self.target_dir, filename)
             if os.path.exists(local_path):
@@ -380,11 +383,43 @@ class DownloadManager:
                             self.active_downloads[url]['progress'] = downloaded
                             self.active_downloads[url]['total'] = total
         
-        # If remote, scp the file
+        # Track downloaded file for bulk transfer
         if self.is_remote:
-            remote_file = f"{self.remote_host}:{self.remote_path}/{filename}"
-            subprocess.run(['scp', local_path, remote_file], capture_output=True, text=True, check=False)
-            os.remove(local_path)
+            with self.lock:
+                self.downloaded_files.append(local_path)
+    
+    def bulk_transfer_to_remote(self):
+        """Transfer all downloaded files to remote host in one SCP operation."""
+        if not self.is_remote or not self.downloaded_files:
+            return True
+        
+        import subprocess
+        
+        print(f"\n\nTransferring {len(self.downloaded_files)} file(s) to {self.remote_host}:{self.remote_path}...")
+        print("You may be prompted for SSH password/passphrase.\n")
+        
+        # Build scp command with all files
+        # Using -p to preserve timestamps, -C for compression
+        scp_cmd = ['scp', '-p', '-C'] + self.downloaded_files + [f"{self.remote_host}:{self.remote_path}/"]
+        
+        try:
+            # Run with interactive TTY so user can enter password
+            result = subprocess.run(scp_cmd, check=False)
+            
+            if result.returncode == 0:
+                print(f"\n✓ Successfully transferred all files to {self.remote_host}")
+                # Clean up temp files
+                import shutil
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+                return True
+            else:
+                print(f"\n✗ Transfer failed with exit code {result.returncode}")
+                print(f"Files are still available locally in: {self.temp_dir}")
+                return False
+        except Exception as e:
+            print(f"\n✗ Transfer error: {e}")
+            print(f"Files are still available locally in: {self.temp_dir}")
+            return False
     
     def add_download(self, url):
         """Add a URL to the download queue."""
@@ -508,6 +543,17 @@ def fetch_iso_list():
         distro_dict = {}
         path_stack = []  # Track current path: [distro, subcategory, subsubcategory, ...]
         current_dict = distro_dict
+        skip_section = False  # Track if we're in a section to skip
+        
+        # Sections to skip (not actual distros)
+        SKIP_SECTIONS = {
+            'Auto-Updated Distributions',
+            'Contributions',
+            'Contributing',
+            'License',
+            'About',
+            'Credits'
+        }
         
         for line in lines:
             stripped = line.strip()
@@ -534,6 +580,17 @@ def fetch_iso_list():
                 level = 0
             
             if heading:
+                # Check if this is a section to skip
+                if level == 2 and heading in SKIP_SECTIONS:
+                    skip_section = True
+                    continue
+                elif level == 2:
+                    skip_section = False
+                
+                # Skip content in skipped sections
+                if skip_section:
+                    continue
+                
                 # Navigate to correct level in hierarchy
                 if level == 2:
                     # Top-level distro
@@ -573,6 +630,10 @@ def fetch_iso_list():
             
             # List item with URL (- [Name](URL))
             elif stripped.startswith("- ["):
+                # Skip content in skipped sections
+                if skip_section:
+                    continue
+                
                 # Parse markdown link format: [Name](URL)
                 import re
                 match = re.match(r'- \[([^\]]+)\]\(([^\)]+)\)', stripped)
@@ -1127,7 +1188,15 @@ def curses_menu(stdscr, distro_dict):
     
     # Stop download manager if it was started
     if download_manager:
+        # Wait for all downloads to complete
+        download_manager.download_queue.join()
         download_manager.stop()
+        
+        # If remote, do bulk transfer
+        if download_manager.is_remote:
+            if not download_manager.bulk_transfer_to_remote():
+                print("\n✗ Failed to transfer files to remote host")
+                print("Files are available locally for manual transfer")
     
     return final_urls, target_directory
 
