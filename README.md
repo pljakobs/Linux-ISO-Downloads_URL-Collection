@@ -160,7 +160,7 @@
 - [GNOME](https://channels.nixos.org/nixos-23.05/latest-nixos-gnome-x86_64-linux.iso)
 
 ## Alpine Linux
-- [Alpine 3.18.2](https://dl-cdn.alpineliux.org/alpine/v3.18/releases/x86_64/alpine-standard-3.18.2-x86_64.iso)
+- [Alpine 3.22.2](https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-standard-3.22.2-x86_64.iso)
 
 ## Endless OS
 - [Endless OS](https://images-dl.endlessm.com/torrents/eos-eos3.9-amd64-amd64.211103-113242.base.iso.torrent)
