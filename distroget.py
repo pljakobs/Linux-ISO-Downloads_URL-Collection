@@ -1150,9 +1150,140 @@ def main():
         config['target_directory'] = target_dir
         save_config(config)
 
+def update_only_mode():
+    """Non-interactive update mode for CI/CD."""
+    print("Updating distro versions in README.md...")
+    
+    file_path = Path('./README.md')
+    if not file_path.exists():
+        print("✗ README.md not found in current directory")
+        sys.exit(1)
+    
+    # Read current content
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    original_content = content
+    changes_made = []
+    
+    # Update auto-update status section at the top
+    auto_update_section = "## Auto-Updated Distributions\n\n"
+    auto_update_section += "The following distributions are automatically updated with the latest versions:\n\n"
+    for distro_name in sorted(DISTRO_UPDATERS.keys()):
+        auto_update_section += f"- ✓ {distro_name}\n"
+    auto_update_section += f"\n*Last update check: {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*\n\n"
+    auto_update_section += "---\n\n"
+    
+    # Check if auto-update section exists
+    if "## Auto-Updated Distributions" in content:
+        # Update existing section
+        import re
+        pattern = r'## Auto-Updated Distributions.*?(?=\n##[^#]|\Z)'
+        content = re.sub(pattern, auto_update_section.rstrip() + '\n\n', content, flags=re.DOTALL)
+    else:
+        # Add section after any leading comments/title but before first ## header
+        import re
+        match = re.search(r'^(.*?)(## [^#])', content, re.DOTALL)
+        if match:
+            content = match.group(1) + auto_update_section + match.group(2) + content[match.end():]
+        else:
+            # No headers found, add at the beginning
+            content = auto_update_section + content
+    
+    # Update each distro
+    for distro_name, updater_class in DISTRO_UPDATERS.items():
+        try:
+            print(f"Updating {distro_name}...")
+            version = updater_class.get_latest_version()
+            
+            if version:
+                # Handle both single version and list of versions
+                if isinstance(version, list):
+                    print(f"  Found versions: {', '.join(version)}")
+                else:
+                    print(f"  Found version: {version}")
+                
+                links = updater_class.generate_download_links(version)
+                
+                if links:
+                    # Validate URLs
+                    print("  Validating URLs...")
+                    validated = 0
+                    total = 0
+                    
+                    # Extract URLs from links structure
+                    urls_to_check = []
+                    if isinstance(links, dict):
+                        for key, value in links.items():
+                            if isinstance(value, list):
+                                for url in value:
+                                    if isinstance(url, str) and url.startswith('http'):
+                                        urls_to_check.append(url)
+                                    elif isinstance(url, str):
+                                        # Extract URL from markdown format
+                                        import re
+                                        match = re.search(r'\(([^)]+)\)', url)
+                                        if match:
+                                            urls_to_check.append(match.group(1))
+                    elif isinstance(links, list):
+                        for link in links:
+                            # Extract URL from markdown format
+                            import re
+                            match = re.search(r'\(([^)]+)\)', link)
+                            if match:
+                                urls_to_check.append(match.group(1))
+                    
+                    # Validate a sample of URLs (up to 3 to avoid too many requests)
+                    sample_urls = urls_to_check[:min(3, len(urls_to_check))]
+                    for url in sample_urls:
+                        if validate_url(url):
+                            validated += 1
+                        total += 1
+                    
+                    if total > 0:
+                        print(f"  Validated {validated}/{total} URLs (sample)")
+                    
+                    # Count links differently for hierarchical structures
+                    if isinstance(links, dict):
+                        total_links = sum(len(v) if isinstance(v, list) else sum(len(sv) for sv in v.values() if isinstance(sv, list)) 
+                                        for v in links.values())
+                        print(f"  Generated {total_links} download link(s)")
+                    else:
+                        print(f"  Generated {len(links)} download link(s)")
+                    
+                    # Add metadata: auto-update marker and timestamp
+                    current_time = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+                    content = updater_class.update_section(content, version, links, 
+                                                          metadata={'auto_updated': True, 'last_updated': current_time})
+                    
+                    if isinstance(version, list):
+                        changes_made.append(f"{distro_name} {', '.join(version)}")
+                    else:
+                        changes_made.append(f"{distro_name} {version}")
+                else:
+                    print("  Could not generate download links")
+            else:
+                print("  Could not determine latest version")
+        except Exception as e:
+            print(f"  Error updating {distro_name}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    if content != original_content:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"\n✓ Updated: {', '.join(changes_made)}")
+        sys.exit(0)
+    else:
+        print("\n✓ No changes needed")
+        sys.exit(0)
+
 if __name__ == "__main__":
+    # Check for --update-only flag
+    if len(sys.argv) > 1 and sys.argv[1] == '--update-only':
+        update_only_mode()
     # Check for --update-repo flag
-    if len(sys.argv) > 1 and sys.argv[1] == '--update-repo':
+    elif len(sys.argv) > 1 and sys.argv[1] == '--update-repo':
         update_repository()
     else:
         main()

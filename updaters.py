@@ -203,8 +203,8 @@ class DebianUpdater(DistroUpdater):
             if match:
                 full_version = match.group(1)
                 stable = full_version.split('.')[0]
-                # Return both stable and testing
-                return {'stable': stable, 'testing': 'testing'}
+                # Only return stable - testing live builds are not consistently available
+                return {'stable': stable}
         except Exception as e:
             print(f"    Error fetching Debian version: {e}")
         
@@ -222,8 +222,7 @@ class DebianUpdater(DistroUpdater):
         branches = []
         if 'stable' in versions:
             branches.append(('stable', 'current-live', versions['stable']))
-        if 'testing' in versions:
-            branches.append(('testing', 'weekly-live-builds', 'testing'))
+        # Testing builds removed - not consistently available
         
         for branch_name, path, version_label in branches:
             base_url = f"https://cdimage.debian.org/debian-cd/{path}/amd64/iso-hybrid"
