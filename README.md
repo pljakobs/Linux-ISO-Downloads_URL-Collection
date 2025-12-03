@@ -122,8 +122,8 @@
 - [Xfce 22.2](https://mirrors.edge.kernel.org/linuxmint/stable/22.2/linuxmint-22.2-xfce-64bit.iso)
 
 ## Zorin OS
-- [Core 16.3](https://sourceforge.net/projects/zorin-os/files/16/Zorin-OS-16.3-Core-64-bit.iso)
-- [Lite 16.3](https://sourceforge.net/projects/zorin-os/files/16/Zorin-OS-16.3-Lite-64-bit.iso)
+- [Core 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Core-64-bit.iso)
+- [Lite 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Lite-64-bit.iso)
 
 ## Pop!_OS
 - [Pop!_OS 24.04](https://pop-iso.sfo2.cdn.digitaloceanspaces.com/24.04/amd64/intel/5/pop-os_24.04_amd64_intel_5.iso)
@@ -256,7 +256,7 @@
 - [KaOS](https://kaosx.us/download/)
 
 ## EndeavourOS
-- [EndeavourOS](https://endeavouros.com/latest-release/)
+- [EndeavourOS 2025.11.24](https://github.com/endeavouros-team/ISO/releases/latest/download/EndeavourOS_2025.11.24.iso)
 
 ## GeckoLinux
 - [GeckoLinux](https://geckolinux.github.io/download/)
