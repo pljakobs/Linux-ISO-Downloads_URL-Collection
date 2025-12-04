@@ -1120,52 +1120,71 @@ def curses_menu(stdscr, distro_dict):
                     
                     # Test SSH connection (non-interactive, quick test)
                     if not transfer_mgr.test_connection():
-                        # SSH keys not set up, need password
-                        ssh_password = show_password_popup(stdscr, f"Password for {remote_host}:")
+                        # SSH keys not set up, need password - retry loop
+                        max_password_attempts = 3
+                        password_attempt = 0
+                        auth_success = False
                         
-                        if ssh_password is None:
-                            # User cancelled password entry
-                            stdscr = curses.initscr()
-                            curses.curs_set(0)
-                            curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
-                            curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
-                            curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-                            curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
-                            target_directory = None
-                            continue
+                        while password_attempt < max_password_attempts and not auth_success:
+                            password_attempt += 1
+                            prompt = f"Password for {remote_host}:"
+                            if password_attempt > 1:
+                                prompt = f"Authentication failed. Try again ({password_attempt}/{max_password_attempts}):"
+                            
+                            ssh_password = show_password_popup(stdscr, prompt)
+                            
+                            if ssh_password is None:
+                                # User cancelled password entry
+                                stdscr = curses.initscr()
+                                curses.curs_set(0)
+                                curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
+                                curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+                                curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+                                curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
+                                target_directory = None
+                                break
+                            
+                            # Check if sshpass is available
+                            if not shutil.which('sshpass'):
+                                curses.endwin()
+                                print("\n✗ sshpass not found. Install it for password authentication:")
+                                print("  Fedora/RHEL: sudo dnf install sshpass")
+                                print("  Debian/Ubuntu: sudo apt install sshpass")
+                                print("\nOr set up SSH keys for password-free access:")
+                                print(f"  ssh-copy-id {remote_host}")
+                                print("\nPress Enter to continue...")
+                                input()
+                                stdscr = curses.initscr()
+                                curses.curs_set(0)
+                                curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
+                                curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+                                curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+                                curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
+                                target_directory = None
+                                break
+                            
+                            # Test connection with password
+                            transfer_mgr.ssh_password = ssh_password
+                            if transfer_mgr.test_connection_with_password():
+                                auth_success = True
+                            else:
+                                # Authentication failed, clear password and retry
+                                ssh_password = None
+                                transfer_mgr.ssh_password = None
                         
-                        # Check if sshpass is available
-                        if not shutil.which('sshpass'):
-                            curses.endwin()
-                            print("\n✗ sshpass not found. Install it for password authentication:")
-                            print("  Fedora/RHEL: sudo dnf install sshpass")
-                            print("  Debian/Ubuntu: sudo apt install sshpass")
-                            print("\nOr set up SSH keys for password-free access:")
-                            print(f"  ssh-copy-id {remote_host}")
-                            print("\nPress Enter to continue...")
-                            input()
-                            stdscr = curses.initscr()
-                            curses.curs_set(0)
-                            curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
-                            curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
-                            curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-                            curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
-                            target_directory = None
-                            continue
-                        
-                        # Test connection with password
-                        transfer_mgr.ssh_password = ssh_password
-                        if not transfer_mgr.test_connection_with_password():
-                            curses.endwin()
-                            print("\n✗ SSH authentication failed")
-                            print("Press Enter to continue...")
-                            input()
-                            stdscr = curses.initscr()
-                            curses.curs_set(0)
-                            curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
-                            curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
-                            curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-                            curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
+                        # If authentication failed after all attempts, abort
+                        if not auth_success:
+                            if target_directory:  # Only show error if user didn't cancel
+                                curses.endwin()
+                                print("\n✗ SSH authentication failed after multiple attempts")
+                                print("Press Enter to continue...")
+                                input()
+                                stdscr = curses.initscr()
+                                curses.curs_set(0)
+                                curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
+                                curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+                                curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+                                curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
                             target_directory = None
                             continue
                     

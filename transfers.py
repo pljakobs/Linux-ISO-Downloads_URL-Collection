@@ -70,12 +70,16 @@ class TransferManager:
             size_mb = os.path.getsize(filepath) / (1024 * 1024)
             print(f"  • {filename} ({size_mb:.1f} MB)")
         
-        print(f"\nTransferring files...\n")
+        print("\nTransferring files...\n")
         
         # Build scp command with all files
         # Using -p to preserve timestamps, -C for compression, -v for verbose
+        env = os.environ.copy()
+        
         if self.ssh_password:
-            scp_cmd = ['sshpass', '-p', self.ssh_password, 'scp', '-p', '-C', '-v'] + \
+            # Use environment variable for password (more secure than -p)
+            env['SSHPASS'] = self.ssh_password
+            scp_cmd = ['sshpass', '-e', 'scp', '-p', '-C', '-v'] + \
                       self.files_to_transfer + [f"{self.remote_host}:{self.remote_path}/"]
         else:
             scp_cmd = ['scp', '-p', '-C', '-v'] + self.files_to_transfer + \
@@ -83,7 +87,7 @@ class TransferManager:
         
         try:
             # Run with interactive TTY (or non-interactive with sshpass)
-            result = subprocess.run(scp_cmd, check=False)
+            result = subprocess.run(scp_cmd, check=False, env=env)
             
             if result.returncode == 0:
                 with self.lock:
@@ -103,7 +107,7 @@ class TransferManager:
                 print(f"\nFiles are still available locally in: {self.temp_dir}")
                 if self.ssh_password:
                     print("You can manually transfer them with:")
-                    print(f"  sshpass -p 'YOUR_PASSWORD' scp {self.temp_dir}/* {self.remote_host}:{self.remote_path}/")
+                    print(f"  SSHPASS='your_password' sshpass -e scp {self.temp_dir}/* {self.remote_host}:{self.remote_path}/")
                 else:
                     print("You can manually transfer them with:")
                     print(f"  scp {self.temp_dir}/* {self.remote_host}:{self.remote_path}/")
@@ -136,12 +140,17 @@ class TransferManager:
         if not shutil.which('sshpass'):
             return False
         
+        env = os.environ.copy()
+        env['SSHPASS'] = self.ssh_password
+        
         test_with_pw = subprocess.run(
-            ['sshpass', '-p', self.ssh_password, 'ssh', '-o', 'ConnectTimeout=5',
+            ['sshpass', '-e', 'ssh', '-o', 'ConnectTimeout=5',
              self.remote_host, 'echo "SSH OK"'],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
+            env=env,
+            check=False
         )
         
         return test_with_pw.returncode == 0
@@ -149,17 +158,22 @@ class TransferManager:
     def create_remote_directory(self):
         """Create the remote directory if it doesn't exist."""
         if self.ssh_password:
+            env = os.environ.copy()
+            env['SSHPASS'] = self.ssh_password
             mkdir_result = subprocess.run(
-                ['sshpass', '-p', self.ssh_password, 'ssh', self.remote_host, 
+                ['sshpass', '-e', 'ssh', self.remote_host, 
                  f'mkdir -p {self.remote_path}'],
                 capture_output=True,
-                text=True
+                text=True,
+                env=env,
+                check=False
             )
         else:
             mkdir_result = subprocess.run(
                 ['ssh', self.remote_host, f'mkdir -p {self.remote_path}'],
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
         
         return mkdir_result.returncode == 0
