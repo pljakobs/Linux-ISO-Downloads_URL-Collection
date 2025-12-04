@@ -18,7 +18,7 @@ The following distributions are automatically updated with the latest versions:
 - ✓ Zorin OS
 - ✓ openSUSE
 
-*Last update check: 2025-12-04 07:35 UTC*
+*Last update check: 2025-12-04 07:39 UTC*
 
 ---
 
@@ -52,7 +52,7 @@ The following distributions are automatically updated with the latest versions:
 - [Minimal](https://cdimage.ubuntu.com/xubuntu/releases/24.04/release/xubuntu-24.04-minimal-amd64.iso)
 
 ## Kali Linux
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [Live](https://archive.kali.org/kali-images/current/kali-linux-2025.3-live-amd64.iso)
 - [Installer (Purple)](https://archive.kali.org/kali-images/current/kali-linux-2025.3-installer-purple-amd64.iso)
 - [Installer (Netinst)](https://archive.kali.org/kali-images/current/kali-linux-2025.3-installer-netinst-amd64.iso)
@@ -71,7 +71,7 @@ The following distributions are automatically updated with the latest versions:
 - [BackBox 8.1](https://backbox.mirror.garr.it/backbox-8.1-desktop-amd64.iso)
 
 ## MX Linux
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [MX-17.1 AHS](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-17.1_ahs_x64.iso)
 - [MX-17.1](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-17.1_x64.iso)
 
@@ -134,7 +134,7 @@ The following distributions are automatically updated with the latest versions:
 
 
 ## Arch Linux
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [Arch Linux 2025.12.01](https://geo.mirror.pkgbuild.com/iso/2025.12.01/archlinux-2025.12.01-x86_64.iso)
 
 ## Manjaro
@@ -143,18 +143,18 @@ The following distributions are automatically updated with the latest versions:
 - [GNOME 23.0](https://download.manjaro.org/gnome/23.0/manjaro-gnome-23.0-230701-linux61.iso)
 
 ## Linux Mint
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [Cinnamon 22.2](https://mirrors.edge.kernel.org/linuxmint/stable/22.2/linuxmint-22.2-cinnamon-64bit.iso)
 - [Mate 22.2](https://mirrors.edge.kernel.org/linuxmint/stable/22.2/linuxmint-22.2-mate-64bit.iso)
 - [Xfce 22.2](https://mirrors.edge.kernel.org/linuxmint/stable/22.2/linuxmint-22.2-xfce-64bit.iso)
 
 ## Zorin OS
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [Core 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Core-64-bit.iso)
 - [Lite 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Lite-64-bit.iso)
 
 ## Pop!_OS
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [Pop!_OS 24.04](https://pop-iso.sfo2.cdn.digitaloceanspaces.com/24.04/amd64/intel/5/pop-os_24.04_amd64_intel_5.iso)
 
 ## openSUSE
@@ -189,7 +189,7 @@ The following distributions are automatically updated with the latest versions:
 - [GNOME](https://channels.nixos.org/nixos-23.05/latest-nixos-gnome-x86_64-linux.iso)
 
 ## Alpine Linux
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [Alpine 3.23.0](https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso)
 
 ## Endless OS
@@ -286,7 +286,7 @@ The following distributions are automatically updated with the latest versions:
 - [KaOS](https://kaosx.us/download/)
 
 ## EndeavourOS
-<!-- Auto-updated: 2025-12-04 07:36 UTC -->
+<!-- Auto-updated: 2025-12-04 07:40 UTC -->
 - [EndeavourOS 2025.11.24](https://github.com/endeavouros-team/ISO/releases/latest/download/EndeavourOS_2025.11.24.iso)
 
 ## GeckoLinux
@@ -349,32 +349,32 @@ This repository is provided for informational purposes and adheres to the licens
 - [Xfce](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Xfce-Live-43-1.6.x86_64.iso)
 - [i3](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-i3-Live-43-1.6.x86_64.iso)
 
-### Fedora 43 Workstation
-- [Fedora-Workstation-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Workstation/x86_64/iso/Fedora-Workstation-Live-43-1.6.x86_64.iso)
+### Fedora 42 Workstation
+- [Fedora-Workstation-Live-42-1.1.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso)
 
-### Fedora 43 Server
-- [Fedora-Server-dvd-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Server/x86_64/iso/Fedora-Server-dvd-x86_64-43-1.6.iso)
-- [Fedora-Server-netinst-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Server/x86_64/iso/Fedora-Server-netinst-x86_64-43-1.6.iso)
+### Fedora 42 Server
+- [Fedora-Server-dvd-x86_64-42-1.1.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-dvd-x86_64-42-1.1.iso)
+- [Fedora-Server-netinst-x86_64-42-1.1.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Server/x86_64/iso/Fedora-Server-netinst-x86_64-42-1.1.iso)
 
-### Fedora 43 Silverblue
-- [Fedora-Silverblue-ostree-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Silverblue/x86_64/iso/Fedora-Silverblue-ostree-x86_64-43-1.6.iso)
+### Fedora 42 Silverblue
+- [Fedora-Silverblue-ostree-x86_64-42-1.1.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Silverblue/x86_64/iso/Fedora-Silverblue-ostree-x86_64-42-1.1.iso)
 
-### Fedora 43 Kinoite
-- [Fedora-Kinoite-ostree-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Kinoite/x86_64/iso/Fedora-Kinoite-ostree-x86_64-43-1.6.iso)
+### Fedora 42 Kinoite
+- [Fedora-Kinoite-ostree-x86_64-42-1.1.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Kinoite/x86_64/iso/Fedora-Kinoite-ostree-x86_64-42-1.1.iso)
 
-### Fedora 43 Spins
-- [Budgie](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Budgie-Live-43-1.6.x86_64.iso)
-- [COSMIC](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-COSMIC-Live-43-1.6.x86_64.iso)
-- [Cinnamon](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-43-1.6.iso)
-- [KDE](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-KDE-Mobile-Live-43-1.6.x86_64.iso)
-- [LXDE](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-LXDE-Live-x86_64-43-1.6.iso)
-- [LXQt](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-LXQt-Live-43-1.6.x86_64.iso)
-- [MATE_Compiz](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-MATE_Compiz-Live-x86_64-43-1.6.iso)
-- [MiracleWM](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-MiracleWM-Live-43-1.6.x86_64.iso)
-- [SoaS](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-SoaS-Live-43-1.6.x86_64.iso)
-- [Sway](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Sway-Live-x86_64-43-1.6.iso)
-- [Xfce](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Xfce-Live-43-1.6.x86_64.iso)
-- [i3](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-i3-Live-43-1.6.x86_64.iso)
+### Fedora 42 Spins
+- [Budgie](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Budgie-Live-42-1.1.x86_64.iso)
+- [COSMIC](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-COSMIC-Live-42-1.1.x86_64.iso)
+- [Cinnamon](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-42-1.1.iso)
+- [KDE](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-KDE-Mobile-Live-42-1.1.x86_64.iso)
+- [LXDE](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-LXDE-Live-x86_64-42-1.1.iso)
+- [LXQt](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-LXQt-Live-42-1.1.x86_64.iso)
+- [MATE_Compiz](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-MATE_Compiz-Live-x86_64-42-1.1.iso)
+- [MiracleWM](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-MiracleWM-Live-42-1.1.x86_64.iso)
+- [SoaS](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-SoaS-Live-42-1.1.x86_64.iso)
+- [Sway](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Sway-Live-x86_64-42-1.1.iso)
+- [Xfce](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-Xfce-Live-42-1.1.x86_64.iso)
+- [i3](https://download.fedoraproject.org/pub/fedora/linux/releases/42/Spins/x86_64/iso/Fedora-i3-Live-x86_64-42-1.1.iso)
 
 ### Fedora CoreOS
 - [fedora-coreos-43.20251110.3.1-live.x86_64.iso](https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/43.20251110.3.1/x86_64/fedora-coreos-43.20251110.3.1-live.x86_64.iso)
