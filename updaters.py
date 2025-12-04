@@ -90,9 +90,9 @@ class FedoraUpdater(DistroUpdater):
             # Find all version numbers
             versions = re.findall(r'href="(\d+)/"', r.text)
             if versions:
-                # Return the two highest version numbers
-                sorted_versions = sorted([int(v) for v in versions], reverse=True)
-                return [str(v) for v in sorted_versions[:2]]
+                # Deduplicate and return the two highest version numbers
+                unique_versions = sorted(set(int(v) for v in versions), reverse=True)
+                return [str(v) for v in unique_versions[:2]]
         except Exception as e:
             print(f"    Error fetching Fedora versions: {e}")
         
@@ -1032,6 +1032,83 @@ class ZorinOSUpdater(DistroUpdater):
         return content
 
 
+class FreeDOSUpdater(DistroUpdater):
+    """Updater for FreeDOS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest FreeDOS version."""
+        try:
+            r = requests.get('https://freedos.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "FreeDOS 1.3" or similar
+            match = re.search(r'FreeDOS (\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching FreeDOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate FreeDOS download links."""
+        if not version:
+            return []
+        
+        links = []
+        
+        # Check for available downloads on the page
+        try:
+            r = requests.get('https://freedos.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Look for direct download links - FreeDOS typically uses .zip format
+            # Pattern for various possible link formats
+            patterns = [
+                r'href="(https?://[^"]*FD\d+[^"]*\.zip)"',
+                r'href="(https?://[^"]*freedos[^"]*\.zip)"',
+                r'href="([^"]*FD\d+[^"]*\.zip)"',
+            ]
+            
+            for pattern in patterns:
+                matches = re.findall(pattern, r.text, re.IGNORECASE)
+                if matches:
+                    for url in matches[:3]:  # Limit to first 3 matches
+                        # Make URL absolute if needed
+                        if not url.startswith('http'):
+                            url = 'https://freedos.org' + url if url.startswith('/') else f'https://freedos.org/download/{url}'
+                        filename = url.split('/')[-1]
+                        links.append(f"- [{filename}]({url})")
+                    break
+            
+            # Fallback to known download pattern if scraping fails
+            if not links:
+                # Use SourceForge as fallback
+                base_url = f"https://sourceforge.net/projects/freedos/files/freedos/{version}"
+                links.append(f"- [FreeDOS {version} (SourceForge)]({base_url})")
+                
+        except Exception as e:
+            print(f"    Warning: Could not scrape FreeDOS downloads: {e}")
+        
+        return links if links else [f"- [FreeDOS {version}](https://freedos.org/download/)"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update FreeDOS section."""
+        if not links:
+            return content
+        
+        section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
+        pattern = r'(## FreeDOS\s*\n)(.*?)(?=\n## [^#]|\Z)'
+        replacement = f'\\1{section_content}\n'
+        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
+        return content
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
@@ -1047,4 +1124,5 @@ DISTRO_UPDATERS = {
     'Manjaro': ManjaroUpdater,
     'EndeavourOS': EndeavourOSUpdater,
     'Zorin OS': ZorinOSUpdater,
+    'FreeDOS': FreeDOSUpdater,
 }

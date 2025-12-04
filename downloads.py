@@ -9,6 +9,10 @@ import queue
 import threading
 import time
 import requests
+import bz2
+import gzip
+import zipfile
+import tarfile
 
 
 class DownloadManager:
@@ -117,9 +121,108 @@ class DownloadManager:
                             self.active_downloads[url]['progress'] = downloaded
                             self.active_downloads[url]['total'] = total
         
-        # Track downloaded file
+        # Decompress if needed
+        decompressed_path = self._decompress_if_needed(local_path)
+        
+        # Track downloaded file (use decompressed path if available)
         with self.lock:
-            self.downloaded_files.append(local_path)
+            self.downloaded_files.append(decompressed_path if decompressed_path else local_path)
+    
+    def _decompress_if_needed(self, filepath):
+        """Decompress file if it's a compressed format. Returns new path or None."""
+        filename = os.path.basename(filepath)
+        
+        # Check for compressed formats
+        if filename.endswith('.bz2'):
+            return self._decompress_bz2(filepath)
+        elif filename.endswith('.gz') and not filename.endswith('.tar.gz'):
+            return self._decompress_gzip(filepath)
+        elif filename.endswith('.zip'):
+            return self._decompress_zip(filepath)
+        # Note: .tar.gz, .tar.bz2, etc. are typically already ISOs and don't need decompression
+        
+        return None
+    
+    def _decompress_bz2(self, filepath):
+        """Decompress a .bz2 file."""
+        output_path = filepath[:-4]  # Remove .bz2 extension
+        
+        try:
+            with bz2.open(filepath, 'rb') as f_in:
+                with open(output_path, 'wb') as f_out:
+                    # Decompress in chunks
+                    while True:
+                        chunk = f_in.read(8192)
+                        if not chunk:
+                            break
+                        f_out.write(chunk)
+            
+            # Remove compressed file
+            os.remove(filepath)
+            return output_path
+        except Exception:
+            # If decompression fails, keep original file
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            return None
+    
+    def _decompress_gzip(self, filepath):
+        """Decompress a .gz file."""
+        output_path = filepath[:-3]  # Remove .gz extension
+        
+        try:
+            with gzip.open(filepath, 'rb') as f_in:
+                with open(output_path, 'wb') as f_out:
+                    # Decompress in chunks
+                    while True:
+                        chunk = f_in.read(8192)
+                        if not chunk:
+                            break
+                        f_out.write(chunk)
+            
+            # Remove compressed file
+            os.remove(filepath)
+            return output_path
+        except Exception:
+            # If decompression fails, keep original file
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            return None
+    
+    def _decompress_zip(self, filepath):
+        """Decompress a .zip file and return the first ISO/IMG file found."""
+        try:
+            extract_dir = os.path.dirname(filepath)
+            
+            with zipfile.ZipFile(filepath, 'r') as zip_ref:
+                # List all files in the zip
+                file_list = zip_ref.namelist()
+                
+                # Find ISO or IMG files
+                iso_files = [f for f in file_list if f.lower().endswith(('.iso', '.img'))]
+                
+                if iso_files:
+                    # Extract the first ISO/IMG file
+                    target_file = iso_files[0]
+                    zip_ref.extract(target_file, extract_dir)
+                    extracted_path = os.path.join(extract_dir, target_file)
+                    
+                    # Remove the zip file
+                    os.remove(filepath)
+                    return extracted_path
+                else:
+                    # Extract all files if no ISO/IMG found
+                    zip_ref.extractall(extract_dir)
+                    os.remove(filepath)
+                    
+                    # Return the first extracted file
+                    if file_list:
+                        return os.path.join(extract_dir, file_list[0])
+            
+            return None
+        except Exception:
+            # If decompression fails, keep original file
+            return None
     
     def add_download(self, url):
         """Add a URL to the download queue."""
