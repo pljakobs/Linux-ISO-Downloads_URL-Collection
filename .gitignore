@@ -1,0 +1,3 @@
+*.pyc
+test_proxmox_deploy.sh
+__pycache__

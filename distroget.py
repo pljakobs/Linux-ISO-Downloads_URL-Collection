@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 from updaters import DISTRO_UPDATERS
 from downloads import DownloadManager
 from transfers import TransferManager, CombinedDownloadTransferManager
+from proxmox import ProxmoxTarget, detect_file_type, select_storage_interactive
+from config_manager import ConfigManager
 import datetime
 
 # URL of the GitHub raw text file
@@ -26,42 +28,19 @@ CONFIG_FILE = Path.home() / ".config" / "distroget" / "config.json"
 
 def load_config():
     """Load configuration from file."""
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            pass
-    
-    # Return default config if file doesn't exist or is invalid
-    return {
-        'location_history': []
-    }
+    config_manager = ConfigManager()
+    return config_manager.config
 
-def save_config(config):
+def save_config(config_dict):
     """Save configuration to file."""
-    try:
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(config, f, indent=2)
-    except Exception as e:
-        print(f"Warning: Could not save config: {e}")
+    config_manager = ConfigManager()
+    config_manager.config = config_dict
+    config_manager.save()
 
 def add_to_location_history(location):
     """Add a location to history, keeping max 10 recent unique locations."""
-    config = load_config()
-    history = config.get('location_history', [])
-    
-    # Remove if already exists (to move it to front)
-    if location in history:
-        history.remove(location)
-    
-    # Add to front
-    history.insert(0, location)
-    
-    # Keep only last 10
-    config['location_history'] = history[:10]
-    save_config(config)
+    config_manager = ConfigManager()
+    config_manager.add_to_location_history(location)
 
 def show_location_popup(stdscr):
     """Show a curses popup to select from location history or enter new."""
@@ -701,6 +680,7 @@ def extract_urls_for_path(distro_dict, item_path):
 # Curses menu
 def curses_menu(stdscr, distro_dict):
     import time
+    from config_manager import ConfigManager
     
     curses.curs_set(0)
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
@@ -721,6 +701,8 @@ def curses_menu(stdscr, distro_dict):
     needs_redraw = True  # Track when screen needs redrawing
     download_manager = None  # Will be initialized when target_directory is set
     downloaded_items = set()  # Track which items have been queued for download
+    config_mgr = ConfigManager()  # For auto-deploy markers
+    auto_deploy_items = set(config_mgr.get_auto_deploy_items())  # Load marked items
 
     while True:
         current_menu = menu_stack[-1]
@@ -748,7 +730,7 @@ def curses_menu(stdscr, distro_dict):
         
         # Draw header
         dest_info = f" | Dest: {target_directory}" if target_directory else ""
-        header = f"Navigate: ↑↓, Select: SPACE, Enter/→: Enter, ←/ESC: Back, /: Search, A: All, D: Set Dir, Q: Quit"
+        header = f"Navigate: ↑↓, Select: SPACE, Enter/→: Enter, ←/ESC: Back, /: Search, a: Auto-deploy, A: All, D: Set Dir, Q: Quit"
         stdscr.addstr(0, 0, header[:width-1])
         
         # Draw path/search line
@@ -798,6 +780,9 @@ def curses_menu(stdscr, distro_dict):
                 item = current_menu[idx]
                 item_path = "/".join(path_stack + [item])
                 
+                # Check if auto-deploy marked
+                auto_mark = "[a]" if item_path in auto_deploy_items else "   "
+                
                 # Determine checkbox state
                 if item_path in selected_items:
                     prefix = "[x]"
@@ -808,7 +793,7 @@ def curses_menu(stdscr, distro_dict):
                 else:
                     prefix = "[ ]"
                 
-                display_line = f"{prefix} {item}"[:left_width-2]
+                display_line = f"{auto_mark}{prefix} {item}"[:left_width-2]
                 screen_row = idx - scroll_offset + 3
                 
                 if idx == current_row:
@@ -1083,7 +1068,27 @@ def curses_menu(stdscr, distro_dict):
                             if url not in downloaded_items:
                                 download_manager.add_download(url)
                                 downloaded_items.add(url)
-        elif key in [ord('a'), ord('A')]:
+        elif key == ord('a'):
+            # Toggle auto-deploy mark for current item
+            item_path = "/".join(path_stack + [current_menu[current_row]])
+            # Only allow marking leaf nodes (actual ISOs)
+            if '/' in item_path:  # Not a top-level category
+                current_node = distro_dict
+                for part in item_path.split('/'):
+                    if isinstance(current_node, dict) and part in current_node:
+                        current_node = current_node[part]
+                    else:
+                        break
+                
+                # Check if it's a leaf (list of URLs)
+                if isinstance(current_node, list):
+                    is_marked = config_mgr.toggle_auto_deploy_item(item_path)
+                    if is_marked:
+                        auto_deploy_items.add(item_path)
+                    else:
+                        auto_deploy_items.discard(item_path)
+                    needs_redraw = True
+        elif key in [ord('A')]:
             # Select all items in current menu
             for item in current_menu:
                 item_path = "/".join(path_stack + [item])
@@ -1355,6 +1360,131 @@ def curses_menu(stdscr, distro_dict):
     
     return final_urls, target_directory
 
+def deploy_to_proxmox_mode():
+    """Interactive mode to deploy downloaded files to Proxmox storage."""
+    import getpass
+    from pathlib import Path
+    
+    print("=" * 80)
+    print("Proxmox VE Deployment Tool")
+    print("=" * 80)
+    print()
+    
+    # Get Proxmox connection details
+    hostname = input("Proxmox hostname or IP: ").strip()
+    if not hostname:
+        print("Hostname required")
+        sys.exit(1)
+    
+    username = input(f"Username [{os.getenv('USER', 'root')}]: ").strip()
+    if not username:
+        username = os.getenv('USER', 'root')
+    
+    password = getpass.getpass(f"Password for {username}@{hostname}: ")
+    
+    # Create Proxmox connection
+    print("\nConnecting to Proxmox...")
+    pve = ProxmoxTarget(hostname, username, password)
+    
+    # Test connection
+    success, message = pve.test_connection()
+    if not success:
+        print(f"✗ {message}")
+        sys.exit(1)
+    
+    print(f"✓ {message}")
+    
+    # Discover storages
+    print("\nDiscovering storages...")
+    storages = pve.discover_storages()
+    
+    if not storages:
+        print("✗ No storages found")
+        sys.exit(1)
+    
+    print(f"✓ Found {len(storages)} storage(s)")
+    
+    # Get files to upload
+    print("\nSelect files to upload:")
+    print("  1. Upload files from a directory")
+    print("  2. Upload specific file")
+    
+    choice = input("\nChoice (1-2): ").strip()
+    
+    files_to_upload = []
+    
+    if choice == '1':
+        directory = input("Directory path: ").strip()
+        if not os.path.isdir(directory):
+            print(f"✗ Directory not found: {directory}")
+            sys.exit(1)
+        
+        # Find all ISO, qcow2, img files
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.lower().endswith(('.iso', '.qcow2', '.img', '.raw', '.tar.gz', '.tar.xz')):
+                    files_to_upload.append(os.path.join(root, file))
+        
+        if not files_to_upload:
+            print("✗ No ISO or cloud image files found in directory")
+            sys.exit(1)
+        
+        print(f"\nFound {len(files_to_upload)} file(s):")
+        for i, file in enumerate(files_to_upload, 1):
+            size = os.path.getsize(file)
+            print(f"  {i}. {os.path.basename(file)} ({format_size(size)})")
+        
+    elif choice == '2':
+        filepath = input("File path: ").strip()
+        if not os.path.isfile(filepath):
+            print(f"✗ File not found: {filepath}")
+            sys.exit(1)
+        files_to_upload.append(filepath)
+    else:
+        print("Invalid choice")
+        sys.exit(1)
+    
+    # Upload each file
+    print()
+    for i, filepath in enumerate(files_to_upload, 1):
+        filename = os.path.basename(filepath)
+        file_type = detect_file_type(filename)
+        
+        print(f"\n[{i}/{len(files_to_upload)}] Uploading {filename}")
+        print(f"  Detected type: {file_type}")
+        
+        # Select storage
+        storage = select_storage_interactive(pve, file_type)
+        if not storage:
+            print("  Skipped")
+            continue
+        
+        # Upload with progress
+        def progress_callback(percent, name):
+            print(f"\r  Progress: {percent}% ", end='', flush=True)
+        
+        success, message = pve.upload_file(filepath, storage, file_type, progress_callback)
+        print()  # New line after progress
+        
+        if success:
+            print(f"  ✓ {message}")
+        else:
+            print(f"  ✗ {message}")
+    
+    print("\n" + "=" * 80)
+    print("Deployment complete")
+    print("=" * 80)
+
+
+def format_size(bytes_size):
+    """Format bytes into human-readable size."""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes_size < 1024.0:
+            return f"{bytes_size:.1f} {unit}"
+        bytes_size /= 1024.0
+    return f"{bytes_size:.1f} PB"
+
+
 def main():
     config = load_config()
     print("Fetching distros...")
@@ -1503,12 +1633,48 @@ def update_only_mode():
         sys.exit(0)
 
 if __name__ == "__main__":
-    # Check for --update-only flag
-    if len(sys.argv) > 1 and sys.argv[1] == '--update-only':
-        update_only_mode()
-    # Check for --update-repo flag
-    elif len(sys.argv) > 1 and sys.argv[1] == '--update-repo':
-        update_repository()
+    # Check for command-line flags
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--update-only':
+            update_only_mode()
+        elif sys.argv[1] == '--update-repo':
+            update_repository()
+        elif sys.argv[1] == '--deploy-to-proxmox':
+            deploy_to_proxmox_mode()
+        elif sys.argv[1] == '--configure':
+            # Run configuration menu
+            from configure import main_config_menu
+            main_config_menu()
+        elif sys.argv[1] == '--auto-update':
+            # Run automatic update
+            from auto_update import main as auto_update_main
+            auto_update_main()
+        elif sys.argv[1] == '--help' or sys.argv[1] == '-h':
+            print("distroget - Linux ISO/Cloud Image Downloader and Proxmox Deployer")
+            print()
+            print("Usage:")
+            print("  python3 distroget.py                      Interactive TUI mode")
+            print("  python3 distroget.py --configure          Configure Proxmox and auto-update")
+            print("  python3 distroget.py --auto-update        Run automatic updates (for cron)")
+            print("  python3 distroget.py --deploy-to-proxmox  Deploy local files to Proxmox")
+            print("  python3 distroget.py --update-only        Update README.md versions (CI mode)")
+            print("  python3 distroget.py --update-repo        Update GitHub repository")
+            print("  python3 distroget.py --help               Show this help")
+            print()
+            print("Configuration:")
+            print("  Run '--configure' to set up:")
+            print("    • Proxmox VE server connection")
+            print("    • Storage mappings (ISO, LXC, snippets)")
+            print("    • Auto-update distribution selection")
+            print()
+            print("Automation:")
+            print("  Add to crontab for daily updates:")
+            print("    0 2 * * * /usr/bin/python3 /path/to/distroget.py --auto-update")
+            sys.exit(0)
+        else:
+            print(f"Unknown option: {sys.argv[1]}")
+            print("Use --help for usage information")
+            sys.exit(1)
     else:
         main()
 

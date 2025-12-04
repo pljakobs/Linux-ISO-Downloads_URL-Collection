@@ -1109,11 +1109,331 @@ class FreeDOSUpdater(DistroUpdater):
         return content
 
 
+class FedoraCloudUpdater(DistroUpdater):
+    """Updater for Fedora Cloud Base images."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Fedora Cloud versions."""
+        try:
+            # Use the base mirror without following redirects to avoid mirror issues
+            r = requests.get('https://mirrors.fedoraproject.org/metalink?repo=fedora-40&arch=x86_64', 
+                           timeout=10)
+            if r.status_code != 200:
+                # Fallback: scrape from cloud page
+                r = requests.get('https://fedoraproject.org/cloud/download', timeout=10)
+            r.raise_for_status()
+            
+            # Find version numbers in content
+            versions = re.findall(r'fedora[/-](\d+)', r.text, re.IGNORECASE)
+            if versions:
+                unique_versions = sorted(set(int(v) for v in versions if int(v) >= 38), reverse=True)
+                return [str(v) for v in unique_versions[:2]]
+            
+            # Hard fallback to known stable versions
+            return ['40', '39']
+        except Exception as e:
+            print(f"    Error fetching Fedora Cloud versions: {e}")
+            # Return known stable versions as fallback
+            return ['40', '39']
+    
+    @staticmethod
+    def generate_download_links(versions):
+        """Generate Fedora Cloud image links."""
+        if not versions or not isinstance(versions, list):
+            return {}
+        
+        structure = {}
+        
+        for version in versions:
+            try:
+                base_url = f"https://download.fedoraproject.org/pub/fedora/linux/releases/{version}/Cloud/x86_64/images"
+                r = requests.get(base_url + "/", timeout=10, allow_redirects=True)
+                r.raise_for_status()
+                
+                # Find qcow2 image (generic cloud image)
+                qcow2_pattern = re.compile(r'href="(Fedora-Cloud-Base-Generic[^"]*\.qcow2)"')
+                matches = qcow2_pattern.findall(r.text)
+                
+                if matches:
+                    structure[version] = [f"{base_url}/{matches[0]}"]
+            except Exception as e:
+                print(f"    Warning: Could not fetch Fedora {version} Cloud: {e}")
+        
+        return structure
+    
+    @staticmethod
+    def update_section(content, versions, structure, metadata=None):
+        """Update Fedora Cloud section."""
+        pattern = r'## Fedora Cloud\s*\n(.*?)(?=\n## [^#]|\Z)'
+        
+        if structure:
+            new_section = "## Fedora Cloud\n\n"
+            
+            for version in versions:
+                if version in structure:
+                    new_section += f"### Fedora {version} Cloud Base\n"
+                    for url in structure[version]:
+                        filename = url.split('/')[-1]
+                        new_section += f"- [{filename}]({url})\n"
+                    new_section += "\n"
+            
+            if re.search(pattern, content, re.DOTALL):
+                content = re.sub(pattern, new_section, content, flags=re.DOTALL)
+            else:
+                content = f"{content}\n{new_section}"
+        
+        return content
+
+
+class UbuntuCloudUpdater(DistroUpdater):
+    """Updater for Ubuntu Cloud images."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Ubuntu LTS and latest versions."""
+        try:
+            r = requests.get('https://cloud-images.ubuntu.com/', timeout=10)
+            r.raise_for_status()
+            
+            # Find release directories
+            releases = re.findall(r'href="([a-z]+)/"', r.text)
+            
+            # Map to version numbers (need to check each)
+            versions = {}
+            for release in releases:
+                if release in ['daily', 'server', 'minimal']:
+                    continue
+                try:
+                    r2 = requests.get(f'https://cloud-images.ubuntu.com/{release}/current/', timeout=5)
+                    if r2.status_code == 200:
+                        # Extract version from filename
+                        match = re.search(r'(\d+\.\d+)', r2.text)
+                        if match:
+                            ver = match.group(1)
+                            # LTS versions end in .04
+                            if ver.endswith('.04'):
+                                versions['lts'] = {'name': release, 'version': ver}
+                            else:
+                                versions['latest'] = {'name': release, 'version': ver}
+                except:
+                    pass
+            
+            return versions if versions else None
+        except Exception as e:
+            print(f"    Error fetching Ubuntu Cloud versions: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(versions):
+        """Generate Ubuntu Cloud image links."""
+        if not versions or not isinstance(versions, dict):
+            return {}
+        
+        structure = {}
+        
+        for version_type, info in versions.items():
+            release_name = info['name']
+            base_url = f"https://cloud-images.ubuntu.com/{release_name}/current"
+            
+            try:
+                r = requests.get(base_url + "/", timeout=10)
+                r.raise_for_status()
+                
+                # Find server cloudimg
+                img_pattern = re.compile(r'href="([^"]*server-cloudimg-amd64\.img)"')
+                matches = img_pattern.findall(r.text)
+                
+                if matches:
+                    structure[version_type] = {
+                        'version': info['version'],
+                        'name': release_name,
+                        'urls': [f"{base_url}/{matches[0]}"]
+                    }
+            except Exception as e:
+                print(f"    Warning: Could not fetch Ubuntu Cloud {release_name}: {e}")
+        
+        return structure
+    
+    @staticmethod
+    def update_section(content, versions, structure, metadata=None):
+        """Update Ubuntu Cloud section."""
+        pattern = r'## Ubuntu Cloud\s*\n(.*?)(?=\n## [^#]|\Z)'
+        
+        if structure:
+            new_section = "## Ubuntu Cloud\n\n"
+            
+            for version_type in ['lts', 'latest']:
+                if version_type in structure:
+                    info = structure[version_type]
+                    type_label = 'LTS' if version_type == 'lts' else ''
+                    new_section += f"### Ubuntu {info['version']} Cloud {type_label}\n".strip() + "\n"
+                    for url in info['urls']:
+                        filename = url.split('/')[-1]
+                        new_section += f"- [{filename}]({url})\n"
+                    new_section += "\n"
+            
+            if re.search(pattern, content, re.DOTALL):
+                content = re.sub(pattern, new_section, content, flags=re.DOTALL)
+            else:
+                content = f"{content}\n{new_section}"
+        
+        return content
+
+
+class DebianCloudUpdater(DistroUpdater):
+    """Updater for Debian Cloud images."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Debian cloud image version."""
+        try:
+            r = requests.get('https://cloud.debian.org/images/cloud/', timeout=10)
+            r.raise_for_status()
+            
+            # Find release directories (e.g., bookworm, bullseye)
+            releases = re.findall(r'href="([a-z]+)/"', r.text)
+            
+            # Get the latest release (typically first non-daily)
+            for release in releases:
+                if release not in ['sid', 'daily']:
+                    # Map codename to version
+                    codename_map = {
+                        'bookworm': '12',
+                        'bullseye': '11',
+                        'buster': '10',
+                        'trixie': '13'
+                    }
+                    if release in codename_map:
+                        return {'name': release, 'version': codename_map[release]}
+        except Exception as e:
+            print(f"    Error fetching Debian Cloud version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version_info):
+        """Generate Debian Cloud image links."""
+        if not version_info or not isinstance(version_info, dict):
+            return []
+        
+        release = version_info['name']
+        base_url = f"https://cloud.debian.org/images/cloud/{release}/latest"
+        
+        try:
+            r = requests.get(base_url + "/", timeout=10)
+            r.raise_for_status()
+            
+            # Find generic cloud image (qcow2)
+            img_pattern = re.compile(r'href="(debian-\d+-generic-amd64[^"]*\.qcow2)"')
+            matches = img_pattern.findall(r.text)
+            
+            if matches:
+                return [f"{base_url}/{matches[0]}"]
+        except Exception as e:
+            print(f"    Warning: Could not fetch Debian Cloud {release}: {e}")
+        
+        return []
+    
+    @staticmethod
+    def update_section(content, version_info, links, metadata=None):
+        """Update Debian Cloud section."""
+        if not links:
+            return content
+        
+        pattern = r'## Debian Cloud\s*\n(.*?)(?=\n## [^#]|\Z)'
+        version = version_info.get('version', 'latest')
+        
+        new_section = f"## Debian Cloud\n\n### Debian {version} Cloud\n"
+        for url in links:
+            filename = url.split('/')[-1]
+            new_section += f"- [{filename}]({url})\n"
+        new_section += "\n"
+        
+        if re.search(pattern, content, re.DOTALL):
+            content = re.sub(pattern, new_section, content, flags=re.DOTALL)
+        else:
+            content = f"{content}\n{new_section}"
+        
+        return content
+
+
+class RockyCloudUpdater(DistroUpdater):
+    """Updater for Rocky Linux Cloud images."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Rocky Linux version."""
+        try:
+            r = requests.get('https://download.rockylinux.org/pub/rocky/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version directories
+            versions = re.findall(r'href="(\d+)/"', r.text)
+            if versions:
+                return sorted(versions, reverse=True)[0]
+        except Exception as e:
+            print(f"    Error fetching Rocky Cloud version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Rocky Linux Cloud image links."""
+        if not version:
+            return []
+        
+        base_url = f"https://download.rockylinux.org/pub/rocky/{version}/images/x86_64"
+        
+        try:
+            r = requests.get(base_url + "/", timeout=10)
+            r.raise_for_status()
+            
+            # Find GenericCloud qcow2 image
+            img_pattern = re.compile(r'href="(Rocky-\d+-GenericCloud[^"]*\.qcow2)"')
+            matches = img_pattern.findall(r.text)
+            
+            if matches:
+                # Get the latest (highest version number)
+                latest = sorted(matches)[-1]
+                return [f"{base_url}/{latest}"]
+        except Exception as e:
+            print(f"    Warning: Could not fetch Rocky {version} Cloud: {e}")
+        
+        return []
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Rocky Cloud section."""
+        if not links:
+            return content
+        
+        pattern = r'## Rocky Linux Cloud\s*\n(.*?)(?=\n## [^#]|\Z)'
+        
+        new_section = f"## Rocky Linux Cloud\n\n### Rocky Linux {version} Cloud\n"
+        for url in links:
+            filename = url.split('/')[-1]
+            new_section += f"- [{filename}]({url})\n"
+        new_section += "\n"
+        
+        if re.search(pattern, content, re.DOTALL):
+            content = re.sub(pattern, new_section, content, flags=re.DOTALL)
+        else:
+            content = f"{content}\n{new_section}"
+        
+        return content
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
+    'Fedora Cloud': FedoraCloudUpdater,
     'Debian': DebianUpdater,
+    'Debian Cloud': DebianCloudUpdater,
     'Ubuntu': UbuntuUpdater,
+    'Ubuntu Cloud': UbuntuCloudUpdater,
+    'Rocky Linux Cloud': RockyCloudUpdater,
     'openSUSE': OpenSUSEUpdater,
     'Linux Mint': LinuxMintUpdater,
     'Arch Linux': ArchLinuxUpdater,
