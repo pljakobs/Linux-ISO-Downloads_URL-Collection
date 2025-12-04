@@ -4,12 +4,12 @@ import json
 import os
 import requests
 import sys
-import threading
-import queue
 import time
 from pathlib import Path
 from urllib.parse import urlparse
 from updaters import DISTRO_UPDATERS
+from downloads import DownloadManager
+from transfers import TransferManager, CombinedDownloadTransferManager
 import datetime
 
 # URL of the GitHub raw text file
@@ -438,207 +438,6 @@ def update_repository():
     except Exception as e:
         print(f"Error updating repository: {e}")
 
-class DownloadManager:
-    """Manages parallel downloads in background threads."""
-    def __init__(self, target_dir, is_remote=False, remote_host=None, remote_path=None, ssh_password=None, max_workers=3):
-        self.target_dir = target_dir
-        self.is_remote = is_remote
-        self.remote_host = remote_host
-        self.remote_path = remote_path
-        self.ssh_password = ssh_password
-        self.max_workers = max_workers
-        self.download_queue = queue.Queue()
-        self.active_downloads = {}
-        self.completed = set()
-        self.completed_urls = set()
-        self.failed = set()
-        self.retry_counts = {}  # Track retry attempts per URL
-        self.max_retries = 3
-        self.lock = threading.Lock()
-        self.workers = []
-        self.running = True
-        self.temp_dir = None
-        self.downloaded_files = []  # Track files for bulk transfer
-        self.transfer_status = "pending"  # pending, transferring, completed, failed
-        self.transfer_progress = {}  # Track individual file transfers
-        
-        # Setup temp directory for remote downloads
-        if self.is_remote:
-            import tempfile
-            self.temp_dir = tempfile.mkdtemp(prefix='distroget_')
-        
-    def start(self):
-        """Start download worker threads."""
-        for i in range(self.max_workers):
-            worker = threading.Thread(target=self._worker, daemon=True)
-            worker.start()
-            self.workers.append(worker)
-    
-    def _worker(self):
-        """Worker thread that processes downloads."""
-        while self.running:
-            try:
-                url = self.download_queue.get(timeout=0.5)
-            except queue.Empty:
-                continue
-            
-            filename = url.split('/')[-1]
-            with self.lock:
-                self.active_downloads[url] = {'filename': filename, 'progress': 0, 'total': 0}
-            
-            try:
-                self._download_file(url, filename)
-                with self.lock:
-                    self.completed.add(url)
-                    self.completed_urls.add(url)
-                    if url in self.active_downloads:
-                        del self.active_downloads[url]
-                    # Clear retry count on success
-                    if url in self.retry_counts:
-                        del self.retry_counts[url]
-            except Exception as e:
-                with self.lock:
-                    # Get current retry count
-                    retry_count = self.retry_counts.get(url, 0)
-                    
-                    if retry_count < self.max_retries:
-                        # Retry the download
-                        self.retry_counts[url] = retry_count + 1
-                        # Re-queue with delay (exponential backoff)
-                        import time
-                        time.sleep(2 ** retry_count)  # 1s, 2s, 4s delays
-                        self.download_queue.put(url)
-                    else:
-                        # Max retries exceeded
-                        self.failed.add(url)
-                    
-                    if url in self.active_downloads:
-                        del self.active_downloads[url]
-            finally:
-                self.download_queue.task_done()
-    
-    def _download_file(self, url, filename):
-        """Download a single file."""
-        if self.is_remote:
-            local_path = os.path.join(self.temp_dir, filename)
-        else:
-            local_path = os.path.join(self.target_dir, filename)
-            if os.path.exists(local_path):
-                return  # Skip existing files
-        
-        # Download the file
-        r = requests.get(url, stream=True, timeout=30)
-        r.raise_for_status()
-        total = int(r.headers.get('content-length', 0))
-        
-        with open(local_path, 'wb') as f:
-            downloaded = 0
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    with self.lock:
-                        if url in self.active_downloads:
-                            self.active_downloads[url]['progress'] = downloaded
-                            self.active_downloads[url]['total'] = total
-        
-        # Track downloaded file for bulk transfer
-        if self.is_remote:
-            with self.lock:
-                self.downloaded_files.append(local_path)
-    
-    def bulk_transfer_to_remote(self):
-        """Transfer all downloaded files to remote host in one SCP operation."""
-        if not self.is_remote or not self.downloaded_files:
-            return True
-        
-        import subprocess
-        
-        # Update status
-        with self.lock:
-            self.transfer_status = "transferring"
-        
-        print(f"\n\n{'='*60}")
-        print(f"Transferring {len(self.downloaded_files)} file(s) to {self.remote_host}:{self.remote_path}")
-        print(f"{'='*60}")
-        
-        # Show list of files being transferred
-        for filepath in self.downloaded_files:
-            filename = os.path.basename(filepath)
-            size_mb = os.path.getsize(filepath) / (1024 * 1024)
-            print(f"  • {filename} ({size_mb:.1f} MB)")
-        
-        print(f"\nTransferring files...\n")
-        
-        # Build scp command with all files
-        # Using -p to preserve timestamps, -C for compression, -v for verbose
-        if self.ssh_password:
-            scp_cmd = ['sshpass', '-p', self.ssh_password, 'scp', '-p', '-C', '-v'] + \
-                      self.downloaded_files + [f"{self.remote_host}:{self.remote_path}/"]
-        else:
-            scp_cmd = ['scp', '-p', '-C', '-v'] + self.downloaded_files + \
-                      [f"{self.remote_host}:{self.remote_path}/"]
-        
-        try:
-            # Run with interactive TTY (or non-interactive with sshpass)
-            result = subprocess.run(scp_cmd, check=False)
-            
-            if result.returncode == 0:
-                with self.lock:
-                    self.transfer_status = "completed"
-                print(f"\n{'='*60}")
-                print(f"✓ Successfully transferred all files to {self.remote_host}")
-                print(f"{'='*60}\n")
-                # Clean up temp files
-                import shutil
-                shutil.rmtree(self.temp_dir, ignore_errors=True)
-                return True
-            else:
-                with self.lock:
-                    self.transfer_status = "failed"
-                print(f"\n{'='*60}")
-                print(f"✗ Transfer failed with exit code {result.returncode}")
-                print(f"{'='*60}")
-                print(f"\nFiles are still available locally in: {self.temp_dir}")
-                if self.ssh_password:
-                    print("You can manually transfer them with:")
-                    print(f"  sshpass -p 'YOUR_PASSWORD' scp {self.temp_dir}/* {self.remote_host}:{self.remote_path}/")
-                else:
-                    print("You can manually transfer them with:")
-                    print(f"  scp {self.temp_dir}/* {self.remote_host}:{self.remote_path}/")
-                return False
-        except Exception as e:
-            with self.lock:
-                self.transfer_status = "failed"
-            print(f"\n✗ Transfer error: {e}")
-            print(f"Files are still available locally in: {self.temp_dir}")
-            return False
-    
-    def add_download(self, url):
-        """Add a URL to the download queue."""
-        self.download_queue.put(url)
-    
-    def get_status(self):
-        """Get current download status."""
-        with self.lock:
-            return {
-                'active': dict(self.active_downloads),
-                'completed': len(self.completed),
-                'completed_urls': set(self.completed_urls),
-                'failed': len(self.failed),
-                'retry_counts': dict(self.retry_counts),
-                'queued': self.download_queue.qsize(),
-                'is_remote': self.is_remote,
-                'transfer_status': self.transfer_status,
-                'transfer_progress': dict(self.transfer_progress),
-                'downloaded_files': list(self.downloaded_files)
-            }
-    
-    def stop(self):
-        """Stop all workers."""
-        self.running = False
-        for worker in self.workers:
-            worker.join(timeout=1)
 
 def download_iso(url, target_dir, is_remote=False, remote_host=None, remote_path=None):
     filename = os.path.basename(urlparse(url).path)
@@ -1265,11 +1064,25 @@ def curses_menu(stdscr, distro_dict):
                 selected_items.add(item_path)
                 # If download manager is active, queue download immediately
                 if download_manager:
-                    urls = extract_urls_for_path(distro_dict, item_path)
-                    for url in urls:
-                        if url not in downloaded_items:
-                            download_manager.add_download(url)
-                            downloaded_items.add(url)
+                    # Check if we're selecting a direct URL item (list entry)
+                    selected_item = current_menu[current_row]
+                    if isinstance(current_menu, list) and ": " in selected_item and "://" in selected_item:
+                        # Extract URL directly from the list item
+                        url_start = selected_item.find(": http")
+                        if url_start == -1:
+                            url_start = selected_item.find(": ftp")
+                        if url_start != -1:
+                            url = selected_item[url_start + 2:]  # Skip ": "
+                            if url not in downloaded_items:
+                                download_manager.add_download(url)
+                                downloaded_items.add(url)
+                    else:
+                        # Navigate through dict structure
+                        urls = extract_urls_for_path(distro_dict, item_path)
+                        for url in urls:
+                            if url not in downloaded_items:
+                                download_manager.add_download(url)
+                                downloaded_items.add(url)
         elif key in [ord('a'), ord('A')]:
             # Select all items in current menu
             for item in current_menu:
@@ -1301,18 +1114,12 @@ def curses_menu(stdscr, distro_dict):
                     remote_host, remote_path = target_directory.split(':', 1)
                     ssh_password = None
                     
-                    # Test SSH connection (non-interactive, quick test)
-                    import subprocess
+                    # Create a transfer manager to test connection
                     import shutil
-                    test_result = subprocess.run(
-                        ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', 
-                         remote_host, 'echo "SSH OK"'], 
-                        capture_output=True, 
-                        text=True,
-                        timeout=10
-                    )
+                    transfer_mgr = TransferManager(remote_host, remote_path, ssh_password)
                     
-                    if test_result.returncode != 0:
+                    # Test SSH connection (non-interactive, quick test)
+                    if not transfer_mgr.test_connection():
                         # SSH keys not set up, need password
                         ssh_password = show_password_popup(stdscr, f"Password for {remote_host}:")
                         
@@ -1347,17 +1154,10 @@ def curses_menu(stdscr, distro_dict):
                             continue
                         
                         # Test connection with password
-                        test_with_pw = subprocess.run(
-                            ['sshpass', '-p', ssh_password, 'ssh', '-o', 'ConnectTimeout=5',
-                             remote_host, 'echo "SSH OK"'],
-                            capture_output=True,
-                            text=True,
-                            timeout=10
-                        )
-                        
-                        if test_with_pw.returncode != 0:
+                        transfer_mgr.ssh_password = ssh_password
+                        if not transfer_mgr.test_connection_with_password():
                             curses.endwin()
-                            print(f"\n✗ SSH authentication failed: {test_with_pw.stderr.strip()}")
+                            print("\n✗ SSH authentication failed")
                             print("Press Enter to continue...")
                             input()
                             stdscr = curses.initscr()
@@ -1371,25 +1171,9 @@ def curses_menu(stdscr, distro_dict):
                     
                     if target_directory:
                         # Create remote directory
-                        if ssh_password:
-                            mkdir_result = subprocess.run(
-                                ['sshpass', '-p', ssh_password, 'ssh', remote_host, 
-                                 f'mkdir -p {remote_path}'],
-                                capture_output=True,
-                                text=True,
-                                timeout=30
-                            )
-                        else:
-                            mkdir_result = subprocess.run(
-                                ['ssh', remote_host, f'mkdir -p {remote_path}'],
-                                capture_output=True,
-                                text=True,
-                                timeout=30
-                            )
-                        
-                        if mkdir_result.returncode != 0:
+                        if not transfer_mgr.create_remote_directory():
                             curses.endwin()
-                            print(f"\n✗ Could not create remote directory: {mkdir_result.stderr.strip()}")
+                            print("\n✗ Could not create remote directory")
                             print("Press Enter to continue...")
                             input()
                             stdscr = curses.initscr()
@@ -1401,8 +1185,8 @@ def curses_menu(stdscr, distro_dict):
                             target_directory = None
                             continue
                         
-                        download_manager = DownloadManager(None, is_remote=True, remote_host=remote_host, 
-                                                         remote_path=remote_path, ssh_password=ssh_password)
+                        download_manager = CombinedDownloadTransferManager(
+                            remote_host, remote_path, ssh_password=ssh_password)
                 else:
                     Path(target_directory).mkdir(parents=True, exist_ok=True)
                     download_manager = DownloadManager(target_directory)
@@ -1412,6 +1196,21 @@ def curses_menu(stdscr, distro_dict):
                     
                     # Queue any already-selected items for download
                     for item_path in selected_items:
+                        # Check if this is a direct list item (contains URL)
+                        # URLs contain "://", so if the path contains it, extract the URL part
+                        if "://" in item_path:
+                            # Find where the URL starts (after ": ")
+                            url_start = item_path.find(": http")
+                            if url_start == -1:
+                                url_start = item_path.find(": ftp")
+                            if url_start != -1:
+                                url = item_path[url_start + 2:]  # Skip ": "
+                                if url not in downloaded_items:
+                                    download_manager.add_download(url)
+                                    downloaded_items.add(url)
+                                continue
+                        
+                        # Otherwise, extract URLs from path
                         urls = extract_urls_for_path(distro_dict, item_path)
                         for url in urls:
                             if url not in downloaded_items:
@@ -1525,15 +1324,15 @@ def curses_menu(stdscr, distro_dict):
     
     # Stop download manager if it was started
     if download_manager:
-        # Wait for all downloads to complete
-        download_manager.download_queue.join()
-        download_manager.stop()
-        
-        # If remote, do bulk transfer
-        if download_manager.is_remote:
-            if not download_manager.bulk_transfer_to_remote():
+        # Check if it's a combined manager (remote) or regular manager (local)
+        if isinstance(download_manager, CombinedDownloadTransferManager):
+            if not download_manager.wait_and_transfer():
                 print("\n✗ Failed to transfer files to remote host")
                 print("Files are available locally for manual transfer")
+        else:
+            # Local downloads - just wait for completion
+            download_manager.download_queue.join()
+            download_manager.stop()
     
     return final_urls, target_directory
 
