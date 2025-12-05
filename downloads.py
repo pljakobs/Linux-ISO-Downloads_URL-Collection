@@ -238,7 +238,8 @@ class DownloadManager:
                 'failed': len(self.failed),
                 'retry_counts': dict(self.retry_counts),
                 'queued': self.download_queue.qsize(),
-                'downloaded_files': list(self.downloaded_files)
+                'downloaded_files': list(self.downloaded_files),
+                'is_remote': False
             }
     
     def stop(self):
