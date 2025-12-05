@@ -231,6 +231,48 @@ def configure_auto_update_menu():
             print("✗ Invalid choice")
 
 
+def configure_download_directory():
+    """Configure auto-update download directory."""
+    config = ConfigManager()
+    current_dir = config.get_auto_update_download_dir()
+    
+    print("\n" + "=" * 70)
+    print("Configure Auto-Update Download Directory")
+    print("=" * 70)
+    print(f"\nCurrent directory: {current_dir}")
+    print("\nThis directory will be used for automatic ISO/cloud image downloads.")
+    print("The directory will be created if it doesn't exist.")
+    print()
+    
+    new_dir = input(f"New download directory [{current_dir}]: ").strip()
+    
+    if not new_dir:
+        print("✗ No changes made")
+        return
+    
+    # Expand ~
+    from pathlib import Path
+    new_dir = str(Path(new_dir).expanduser())
+    
+    # Confirm
+    print(f"\nNew download directory: {new_dir}")
+    confirm = input("Save this setting? [Y/n]: ").strip().lower()
+    
+    if confirm in ['', 'y', 'yes']:
+        config.set_auto_update_download_dir(new_dir)
+        print(f"✓ Download directory configured: {new_dir}")
+        
+        # Create directory if it doesn't exist
+        try:
+            Path(new_dir).mkdir(parents=True, exist_ok=True)
+            print(f"✓ Directory created/verified")
+        except Exception as e:
+            print(f"⚠ Warning: Could not create directory: {e}")
+            print(f"  Directory will be created on first download")
+    else:
+        print("✗ Configuration cancelled")
+
+
 def main_config_menu():
     """Main configuration menu."""
     config = ConfigManager()
@@ -246,19 +288,31 @@ def main_config_menu():
         
         auto_distros = config.get_auto_update_distros()
         auto_enabled = config.is_auto_update_enabled()
-        auto_status = f"{len(auto_distros)} distros" if auto_enabled else "Disabled"
+        
+        # Show better status
+        if auto_enabled and len(auto_distros) > 0:
+            auto_status = f"✓ Enabled ({len(auto_distros)} distros)"
+        elif len(auto_distros) > 0:
+            auto_status = f"⚠ Configured but disabled ({len(auto_distros)} distros)"
+        else:
+            auto_status = "✗ Not configured"
+        
+        download_dir = config.get_auto_update_download_dir()
         
         print("\nCurrent Settings:")
         print(f"  Proxmox Server:  {pve_host}")
         print(f"  Auto-Update:     {auto_status}")
+        print(f"  Download Dir:    {download_dir}")
         
         print("\nOptions:")
         print("  1. Configure Proxmox VE connection and storage")
         print("  2. Configure auto-update distributions")
-        print("  3. Show full configuration")
-        print("  4. Export configuration to file")
-        print("  5. Import configuration from file")
-        print("  6. Reset to defaults")
+        print("  3. Configure auto-update download directory")
+        print("  4. Toggle auto-update enabled/disabled")
+        print("  5. Show full configuration")
+        print("  6. Export configuration to file")
+        print("  7. Import configuration from file")
+        print("  8. Reset to defaults")
         print("  q. Quit")
         
         choice = input("\nChoice: ").strip().lower()
@@ -270,10 +324,20 @@ def main_config_menu():
             configure_auto_update_menu()
         
         elif choice == '3':
+            configure_download_directory()
+        
+        elif choice == '4':
+            # Toggle auto-update enabled/disabled
+            current = config.is_auto_update_enabled()
+            config.set_auto_update_enabled(not current)
+            new_state = "enabled" if not current else "disabled"
+            print(f"✓ Auto-update {new_state}")
+        
+        elif choice == '5':
             print()
             config.show_config()
         
-        elif choice == '4':
+        elif choice == '6':
             filepath = input("Export to file: ").strip()
             if filepath:
                 from pathlib import Path
@@ -282,7 +346,7 @@ def main_config_menu():
                 else:
                     print("✗ Export failed")
         
-        elif choice == '5':
+        elif choice == '7':
             filepath = input("Import from file: ").strip()
             if filepath:
                 from pathlib import Path
@@ -291,7 +355,7 @@ def main_config_menu():
                 else:
                     print("✗ Import failed")
         
-        elif choice == '6':
+        elif choice == '8':
             confirm = input("Reset all settings to defaults? [y/N]: ").strip().lower()
             if confirm == 'y':
                 config.reset()

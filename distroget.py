@@ -1697,6 +1697,7 @@ if __name__ == "__main__":
             print("    • Proxmox VE server connection")
             print("    • Storage mappings (ISO, LXC, snippets)")
             print("    • Auto-update distribution selection")
+            print("    • Auto-update download directory")
             print()
             print("TUI Keys:")
             print("  ↑↓        Navigate menu")

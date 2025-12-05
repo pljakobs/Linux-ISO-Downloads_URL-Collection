@@ -75,15 +75,21 @@ def auto_update_distributions(download_dir: Path, deploy_to_proxmox: bool = True
     """
     config = ConfigManager()
     
-    if not config.is_auto_update_enabled():
-        print("Auto-update is not enabled in configuration")
-        return {'status': 'disabled', 'updates': []}
-    
     distros_to_update = config.get_auto_update_distros()
     
     if not distros_to_update:
+        print("=" * 80)
         print("No distributions configured for auto-update")
+        print("=" * 80)
+        print("\nTo configure auto-update:")
+        print("  python3 distroget.py --configure")
+        print("\nThen select option 2 to choose distributions for auto-update.")
         return {'status': 'no_distros', 'updates': []}
+    
+    # Auto-enable if distributions are configured but flag is disabled
+    if not config.is_auto_update_enabled():
+        print("Note: Auto-enabling auto-update (distributions are configured)")
+        config.set_auto_update_enabled(True)
     
     print("=" * 80)
     print(f"Automatic Update - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -365,10 +371,14 @@ def main():
     """Main entry point for auto-update."""
     import argparse
     
+    # Get default download dir from config
+    config = ConfigManager()
+    default_download_dir = config.get_auto_update_download_dir()
+    
     parser = argparse.ArgumentParser(description='Automatic distribution updates')
     parser.add_argument('--download-dir', type=Path, 
-                       default=Path.home() / 'Downloads' / 'distroget-auto',
-                       help='Download directory')
+                       default=Path(default_download_dir),
+                       help=f'Download directory (default: {default_download_dir})')
     parser.add_argument('--no-deploy', action='store_true',
                        help='Skip Proxmox deployment')
     parser.add_argument('--deploy-to-proxmox', action='store_true',

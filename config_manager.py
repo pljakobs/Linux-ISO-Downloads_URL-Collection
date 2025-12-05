@@ -48,7 +48,8 @@ class ConfigManager:
             },
             'auto_update': {
                 'enabled': False,
-                'distributions': []
+                'distributions': [],
+                'download_dir': str(Path.home() / 'Downloads' / 'distroget-auto')
             },
             'auto_deploy_items': []  # List of item paths marked for auto-deploy
         }
@@ -122,6 +123,18 @@ class ConfigManager:
     def is_auto_update_enabled(self) -> bool:
         """Check if auto-update is enabled."""
         return self.config.get('auto_update', {}).get('enabled', False)
+    
+    def get_auto_update_download_dir(self) -> str:
+        """Get auto-update download directory."""
+        default = str(Path.home() / 'Downloads' / 'distroget-auto')
+        return self.config.get('auto_update', {}).get('download_dir', default)
+    
+    def set_auto_update_download_dir(self, download_dir: str):
+        """Set auto-update download directory."""
+        if 'auto_update' not in self.config:
+            self.config['auto_update'] = {}
+        self.config['auto_update']['download_dir'] = download_dir
+        self.save()
     
     def set_auto_update_enabled(self, enabled: bool):
         """Enable or disable auto-update."""
