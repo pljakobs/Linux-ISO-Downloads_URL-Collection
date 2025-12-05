@@ -1104,6 +1104,10 @@ def curses_menu(stdscr, distro_dict):
                 # User wants to enter new location
                 curses.endwin()
                 target_directory = input("\nEnter target directory (or hostname:/path for remote): ").strip()
+                # Expand ~ and environment variables for local paths
+                if target_directory and ':' not in target_directory:
+                    import os
+                    target_directory = os.path.expandvars(os.path.expanduser(target_directory))
             else:
                 # User selected from history
                 target_directory = selected_location

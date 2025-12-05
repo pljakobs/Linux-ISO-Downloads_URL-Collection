@@ -250,9 +250,10 @@ def configure_download_directory():
         print("✗ No changes made")
         return
     
-    # Expand ~
+    # Expand ~ and environment variables like $HOME
     from pathlib import Path
-    new_dir = str(Path(new_dir).expanduser())
+    import os
+    new_dir = os.path.expandvars(os.path.expanduser(new_dir))
     
     # Confirm
     print(f"\nNew download directory: {new_dir}")

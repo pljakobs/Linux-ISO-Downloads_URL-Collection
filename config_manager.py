@@ -18,7 +18,7 @@ class ConfigManager:
             config_path: Path to config file (default: ~/.config/distroget/config.json)
         """
         if config_path:
-            self.config_path = config_path
+            self.config_path = Path(config_path) if not isinstance(config_path, Path) else config_path
         else:
             self.config_path = Path.home() / ".config" / "distroget" / "config.json"
         
@@ -126,14 +126,20 @@ class ConfigManager:
     
     def get_auto_update_download_dir(self) -> str:
         """Get auto-update download directory."""
+        import os
         default = str(Path.home() / 'Downloads' / 'distroget-auto')
-        return self.config.get('auto_update', {}).get('download_dir', default)
+        path = self.config.get('auto_update', {}).get('download_dir', default)
+        # Expand ~ and environment variables like $HOME
+        return os.path.expandvars(os.path.expanduser(path))
     
     def set_auto_update_download_dir(self, download_dir: str):
         """Set auto-update download directory."""
+        import os
         if 'auto_update' not in self.config:
             self.config['auto_update'] = {}
-        self.config['auto_update']['download_dir'] = download_dir
+        # Expand ~ and environment variables like $HOME
+        expanded_dir = os.path.expandvars(os.path.expanduser(download_dir))
+        self.config['auto_update']['download_dir'] = expanded_dir
         self.save()
     
     def set_auto_update_enabled(self, enabled: bool):

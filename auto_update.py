@@ -376,8 +376,8 @@ def main():
     default_download_dir = config.get_auto_update_download_dir()
     
     parser = argparse.ArgumentParser(description='Automatic distribution updates')
-    parser.add_argument('--download-dir', type=Path, 
-                       default=Path(default_download_dir),
+    parser.add_argument('--download-dir', type=str, 
+                       default=default_download_dir,
                        help=f'Download directory (default: {default_download_dir})')
     parser.add_argument('--no-deploy', action='store_true',
                        help='Skip Proxmox deployment')
@@ -387,6 +387,10 @@ def main():
                        help='Show what would be updated without doing it')
     
     args = parser.parse_args()
+    
+    # Expand ~ and environment variables in download directory
+    import os
+    download_dir = Path(os.path.expandvars(os.path.expanduser(args.download_dir)))
     
     # Determine deployment: --deploy-to-proxmox OR (not --no-deploy)
     deploy = args.deploy_to_proxmox or (not args.no_deploy)
@@ -408,13 +412,13 @@ def main():
         for item in auto_deploy_items:
             print(f"  • {item}")
         print()
-        print(f"Download directory: {args.download_dir}")
+        print(f"Download directory: {download_dir}")
         print(f"Deploy to Proxmox: {deploy}")
         return
     
     # Run auto-update
     results = auto_update_distributions(
-        args.download_dir,
+        download_dir,
         deploy_to_proxmox=deploy
     )
     
