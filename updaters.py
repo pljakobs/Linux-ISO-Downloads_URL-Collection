@@ -39,6 +39,17 @@ class DistroUpdater:
             return comment + section_content
         return section_content
 
+    @staticmethod
+    def simple_update_section(content, section_name, links, metadata=None):
+        """Helper to update a simple section with links list."""
+        if not links:
+            return content
+        section_content = '\n'.join(links)
+        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
+        pattern = rf'(## {re.escape(section_name)}\s*\n)(.*?)(?=\n## [^#]|\Z)'
+        replacement = f'\\1{section_content}\n'
+        return re.sub(pattern, replacement, content, flags=re.DOTALL)
+
 
 def get_distrowatch_version(distro_name):
     """
@@ -75,202 +86,85 @@ def get_distrowatch_version(distro_name):
     return None
 
 
+FEDORA_RELEASES_URL = 'https://fedoraproject.org/releases.json'
+_fedora_releases_cache = None
+
+
+def fetch_fedora_releases():
+    """Fetch and cache Fedora releases.json data."""
+    global _fedora_releases_cache
+    if _fedora_releases_cache is not None:
+        return _fedora_releases_cache
+    try:
+        r = requests.get(FEDORA_RELEASES_URL, timeout=10)
+        r.raise_for_status()
+        _fedora_releases_cache = r.json()
+        return _fedora_releases_cache
+    except Exception as e:
+        print(f"    Error fetching Fedora releases.json: {e}")
+        return []
+
+
 class FedoraUpdater(DistroUpdater):
-    """Updater for Fedora Workstation and Spins with multiple versions."""
-    
+    """Updater for Fedora Workstation, Server, Spins, and immutable variants."""
+
+    VARIANTS = ['Workstation', 'Server', 'Silverblue', 'Kinoite', 'Spins']
+
     @staticmethod
     def get_latest_version():
-        """Get latest Fedora versions (latest stable + previous) from releases.json."""
-        try:
-            # Use official Fedora releases API
-            r = requests.get('https://fedoraproject.org/releases.json', timeout=10)
-            r.raise_for_status()
-            
-            import json
-            releases = json.loads(r.text)
-            
-            # Extract unique versions and return top 2
-            versions = sorted(set(int(item['version']) for item in releases), reverse=True)
-            return [str(v) for v in versions[:2]]
-        except Exception as e:
-            print(f"    Error fetching Fedora versions: {e}")
-        
-        return None
-    
+        """Get latest Fedora versions from releases.json."""
+        releases = fetch_fedora_releases()
+        if not releases:
+            return None
+        versions = sorted(set(int(r['version']) for r in releases if r['version'].isdigit()), reverse=True)
+        return [str(v) for v in versions[:2]] if versions else None
+
     @staticmethod
     def generate_download_links(versions):
-        """Generate hierarchical Fedora structure from releases.json."""
-        if not versions or not isinstance(versions, list):
-            return []
-        
-        try:
-            # Fetch releases data
-            r = requests.get('https://fedoraproject.org/releases.json', timeout=10)
-            r.raise_for_status()
-            
-            import json
-            releases = json.loads(r.text)
-            
-            # Filter to x86_64 ISOs only
-            x86_isos = [
-                item for item in releases 
-                if item.get('arch') == 'x86_64' 
-                and item['link'].endswith('.iso')
-                and item.get('version') in versions
-            ]
-            
-            # Build structure: {version: {'Workstation': [urls], 'Server': [urls], etc.}}
-            structure = {}
-            
-            for version in versions:
-                structure[version] = {
-                    'Workstation': [], 
-                    'Server': [],
-                    'Spins': [],
-                    'Silverblue': [],
-                    'Kinoite': [],
-                    'Sway': [],
-                    'Budgie': []
-                }
-                
-                version_isos = [item for item in x86_isos if item['version'] == version]
-                
-                for item in version_isos:
-                    variant = item.get('variant', '')
-                    subvariant = item.get('subvariant', '')
-                    link = item['link']
-                    
-                    # Categorize by variant
-                    if variant == 'Workstation':
-                        structure[version]['Workstation'].append(link)
-                    elif variant == 'Server':
-                        structure[version]['Server'].append(link)
-                    elif variant == 'Silverblue':
-                        structure[version]['Silverblue'].append(link)
-                    elif variant == 'Kinoite':
-                        structure[version]['Kinoite'].append(link)
-                    elif variant == 'Sway':
-                        structure[version]['Sway'].append(link)
-                    elif variant == 'Budgie':
-                        structure[version]['Budgie'].append(link)
-                    elif variant == 'Spins':
-                        structure[version]['Spins'].append(link)
-                
-            # Add CoreOS (stable stream)
-            structure['CoreOS'] = {'Stable': []}
-            try:
-                coreos_url = "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds"
-                r = requests.get(coreos_url + "/builds.json", timeout=10)
-                r.raise_for_status()
-                builds = json.loads(r.text)
-                if 'builds' in builds and builds['builds']:
-                    latest_build = builds['builds'][0]
-                    build_id = latest_build['id']
-                    iso_url = f"https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/{build_id}/x86_64/fedora-coreos-{build_id}-live.x86_64.iso"
-                    structure['CoreOS']['Stable'].append(iso_url)
-            except Exception as e:
-                print(f"    Warning: Could not fetch Fedora CoreOS: {e}")
-            
-            # Add Rawhide from releases.json
-            rawhide_isos = [
-                item for item in releases 
-                if item.get('version') == 'Rawhide' 
-                and item.get('arch') == 'x86_64' 
-                and item['link'].endswith('.iso')
-                and item.get('variant') == 'Workstation'
-            ]
-            
-            if rawhide_isos:
-                structure['Rawhide'] = {'Development': [item['link'] for item in rawhide_isos[:1]]}
-            
-            return structure
-            
-        except Exception as e:
-            print(f"    Error generating Fedora links: {e}")
+        """Generate Fedora download links from releases.json."""
+        if not versions:
             return {}
-    
+        releases = fetch_fedora_releases()
+        if not releases:
+            return {}
+
+        structure = {v: {var: [] for var in FedoraUpdater.VARIANTS} for v in versions}
+
+        for r in releases:
+            if r['arch'] != 'x86_64' or r['version'] not in versions or not r['link'].endswith('.iso'):
+                continue
+            if r['variant'] in structure.get(r['version'], {}):
+                structure[r['version']][r['variant']].append(r['link'])
+
+        for v in versions:
+            for var in FedoraUpdater.VARIANTS:
+                structure[v][var] = sorted(set(structure[v][var]))
+
+        return structure
+
     @staticmethod
     def update_section(content, versions, structure, metadata=None):
         """Update Fedora section with hierarchical markdown."""
-        # Find any existing Fedora section (Fedora or Fedora Workstation)
-        # Match only top-level ## sections (not ### subsections)
         pattern = r'## Fedora(?:\s+Workstation)?\s*\n(.*?)(?=\n## [^#]|\Z)'
-        
-        if structure:
-            new_section = "## Fedora\n\n"
-            
-            for version in versions:
-                if version not in structure:
-                    continue
-                
-                version_data = structure[version]
-                
-                # Add Workstation subsection
-                if version_data.get('Workstation'):
-                    new_section += f"### Fedora {version} Workstation\n"
-                    for url in version_data['Workstation']:
+        if not structure:
+            return content
+
+        new_section = "## Fedora\n\n"
+        for version in versions:
+            if version not in structure:
+                continue
+            for variant in FedoraUpdater.VARIANTS:
+                urls = structure[version].get(variant, [])
+                if urls:
+                    new_section += f"### Fedora {version} {variant}\n"
+                    for url in urls:
                         filename = url.split('/')[-1]
                         new_section += f"- [{filename}]({url})\n"
                     new_section += "\n"
-                
-                # Add Server subsection
-                if version_data.get('Server'):
-                    new_section += f"### Fedora {version} Server\n"
-                    for url in version_data['Server']:
-                        filename = url.split('/')[-1]
-                        new_section += f"- [{filename}]({url})\n"
-                    new_section += "\n"
-                
-                # Add Silverblue subsection
-                if version_data.get('Silverblue'):
-                    new_section += f"### Fedora {version} Silverblue\n"
-                    for url in version_data['Silverblue']:
-                        filename = url.split('/')[-1]
-                        new_section += f"- [{filename}]({url})\n"
-                    new_section += "\n"
-                
-                # Add Kinoite subsection
-                if version_data.get('Kinoite'):
-                    new_section += f"### Fedora {version} Kinoite\n"
-                    for url in version_data['Kinoite']:
-                        filename = url.split('/')[-1]
-                        new_section += f"- [{filename}]({url})\n"
-                    new_section += "\n"
-                
-                # Add Spins subsection
-                if version_data.get('Spins'):
-                    new_section += f"### Fedora {version} Spins\n"
-                    for url in version_data['Spins']:
-                        filename = url.split('/')[-1]
-                        # Extract spin name from filename
-                        match = re.search(r'Fedora-([^-]+)-', filename)
-                        spin_name = match.group(1) if match else filename
-                        new_section += f"- [{spin_name}]({url})\n"
-                    new_section += "\n"
-            
-            # Add CoreOS section
-            if 'CoreOS' in structure and structure['CoreOS'].get('Stable'):
-                new_section += "### Fedora CoreOS\n"
-                for url in structure['CoreOS']['Stable']:
-                    filename = url.split('/')[-1]
-                    new_section += f"- [{filename}]({url})\n"
-                new_section += "\n"
-            
-            # Add Rawhide section
-            if 'Rawhide' in structure and structure['Rawhide'].get('Development'):
-                new_section += "### Fedora Rawhide (Development)\n"
-                for url in structure['Rawhide']['Development']:
-                    filename = url.split('/')[-1]
-                    new_section += f"- [{filename}]({url})\n"
-                new_section += "\n"
-            
-            if re.search(pattern, content, re.DOTALL):
-                content = re.sub(pattern, new_section, content, flags=re.DOTALL)
-            else:
-                # Add new section
-                content = f"{content}\n{new_section}"
-        
-        return content
+
+        if re.search(pattern, content, re.DOTALL):
+            return re.sub(pattern, new_section, content, flags=re.DOTALL)
+        return f"{content}\n{new_section}"
 
 
 class DebianUpdater(DistroUpdater):
@@ -612,16 +506,7 @@ class LinuxMintUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update Linux Mint section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## Linux Mint\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'Linux Mint', links, metadata)
 
 
 class ArchLinuxUpdater(DistroUpdater):
@@ -655,16 +540,7 @@ class ArchLinuxUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update Arch Linux section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## Arch Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'Arch Linux', links, metadata)
 
 
 class MXLinuxUpdater(DistroUpdater):
@@ -693,16 +569,7 @@ class MXLinuxUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update MX Linux section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## MX Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'MX Linux', links, metadata)
 
 
 class KaliLinuxUpdater(DistroUpdater):
@@ -748,16 +615,7 @@ class KaliLinuxUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update Kali Linux section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## Kali Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'Kali Linux', links, metadata)
 
 
 class PopOSUpdater(DistroUpdater):
@@ -793,16 +651,7 @@ class PopOSUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update Pop!_OS section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## Pop!_OS\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'Pop!_OS', links, metadata)
 
 
 class AlpineLinuxUpdater(DistroUpdater):
@@ -840,16 +689,7 @@ class AlpineLinuxUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update Alpine Linux section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## Alpine Linux\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'Alpine Linux', links, metadata)
 
 
 class ManjaroUpdater(DistroUpdater):
@@ -893,16 +733,7 @@ class ManjaroUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update Manjaro section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## Manjaro\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'Manjaro', links, metadata)
 
 
 class EndeavourOSUpdater(DistroUpdater):
@@ -937,16 +768,7 @@ class EndeavourOSUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update EndeavourOS section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## EndeavourOS\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'EndeavourOS', links, metadata)
 
 
 class ZorinOSUpdater(DistroUpdater):
@@ -987,16 +809,7 @@ class ZorinOSUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update Zorin OS section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## Zorin OS\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'Zorin OS', links, metadata)
 
 
 class FreeDOSUpdater(DistroUpdater):
@@ -1064,96 +877,58 @@ class FreeDOSUpdater(DistroUpdater):
     @staticmethod
     def update_section(content, version, links, metadata=None):
         """Update FreeDOS section."""
-        if not links:
-            return content
-        
-        section_content = '\n'.join(links)
-        section_content = DistroUpdater.add_metadata_comment(section_content, metadata)
-        pattern = r'(## FreeDOS\s*\n)(.*?)(?=\n## [^#]|\Z)'
-        replacement = f'\\1{section_content}\n'
-        content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        
-        return content
+        return DistroUpdater.simple_update_section(content, 'FreeDOS', links, metadata)
 
 
 class FedoraCloudUpdater(DistroUpdater):
     """Updater for Fedora Cloud Base images."""
-    
+
     @staticmethod
     def get_latest_version():
         """Get latest Fedora Cloud versions from releases.json."""
-        try:
-            r = requests.get('https://fedoraproject.org/releases.json', timeout=10)
-            r.raise_for_status()
-            
-            import json
-            releases = json.loads(r.text)
-            
-            # Extract unique versions and return top 2
-            versions = sorted(set(int(item['version']) for item in releases), reverse=True)
-            return [str(v) for v in versions[:2]]
-        except Exception as e:
-            print(f"    Error fetching Fedora Cloud versions: {e}")
-            return ['43', '42']  # Fallback
-    
+        releases = fetch_fedora_releases()
+        if not releases:
+            return None
+        versions = sorted(set(int(r['version']) for r in releases
+                             if r['version'].isdigit() and r['variant'] == 'Cloud'), reverse=True)
+        return [str(v) for v in versions[:2]] if versions else None
+
     @staticmethod
     def generate_download_links(versions):
         """Generate Fedora Cloud image links from releases.json."""
-        if not versions or not isinstance(versions, list):
+        if not versions:
             return {}
-        
-        try:
-            r = requests.get('https://fedoraproject.org/releases.json', timeout=10)
-            r.raise_for_status()
-            
-            import json
-            releases = json.loads(r.text)
-            
-            structure = {}
-            
-            for version in versions:
-                # Find Generic qcow2 cloud images for x86_64
-                cloud_images = [
-                    item for item in releases
-                    if item.get('version') == version
-                    and item.get('arch') == 'x86_64'
-                    and item.get('variant') == 'Cloud'
-                    and item.get('subvariant') == 'Cloud_Base'
-                    and 'Generic' in item['link']
-                    and item['link'].endswith('.qcow2')
-                ]
-                
-                if cloud_images:
-                    structure[version] = [item['link'] for item in cloud_images[:1]]  # Take first match
-            
-            return structure
-            
-        except Exception as e:
-            print(f"    Error generating Fedora Cloud links: {e}")
-            return {}
-    
+        releases = fetch_fedora_releases()
+        structure = {v: [] for v in versions}
+
+        for r in releases:
+            if r['arch'] != 'x86_64' or r['version'] not in versions or r['variant'] != 'Cloud':
+                continue
+            if r['link'].endswith('.qcow2') and 'Generic' in r['link']:
+                structure[r['version']].append(r['link'])
+
+        for v in versions:
+            structure[v] = sorted(set(structure[v]))
+        return structure
+
     @staticmethod
     def update_section(content, versions, structure, metadata=None):
         """Update Fedora Cloud section."""
         pattern = r'## Fedora Cloud\s*\n(.*?)(?=\n## [^#]|\Z)'
-        
-        if structure:
-            new_section = "## Fedora Cloud\n\n"
-            
-            for version in versions:
-                if version in structure:
-                    new_section += f"### Fedora {version} Cloud Base\n"
-                    for url in structure[version]:
-                        filename = url.split('/')[-1]
-                        new_section += f"- [{filename}]({url})\n"
-                    new_section += "\n"
-            
-            if re.search(pattern, content, re.DOTALL):
-                content = re.sub(pattern, new_section, content, flags=re.DOTALL)
-            else:
-                content = f"{content}\n{new_section}"
-        
-        return content
+        if not structure:
+            return content
+
+        new_section = "## Fedora Cloud\n\n"
+        for version in versions:
+            if version in structure and structure[version]:
+                new_section += f"### Fedora {version} Cloud Base\n"
+                for url in structure[version]:
+                    new_section += f"- [{url.split('/')[-1]}]({url})\n"
+                new_section += "\n"
+
+        if re.search(pattern, content, re.DOTALL):
+            return re.sub(pattern, new_section, content, flags=re.DOTALL)
+        return f"{content}\n{new_section}"
 
 
 class UbuntuCloudUpdater(DistroUpdater):
