@@ -14,6 +14,7 @@ import gzip
 import zipfile
 import tarfile
 from hash_verifier import HashVerifier
+from torrent_downloader import TorrentDownloader
 
 
 class DownloadManager:
@@ -99,6 +100,16 @@ class DownloadManager:
     
     def _download_file(self, url, filename):
         """Download a single file with progress tracking."""
+        # Check if this is a torrent and if aria2c is available
+        if TorrentDownloader.is_torrent_url(url):
+            if TorrentDownloader.is_available():
+                return self._download_torrent(url, filename)
+            else:
+                # Torrent URL but no aria2c - skip or fail gracefully
+                raise RuntimeError(
+                    f"Torrent download not supported (aria2c not installed): {filename}"
+                )
+        
         local_path = os.path.join(self.target_dir, filename)
         
         # Skip existing files
@@ -111,7 +122,7 @@ class DownloadManager:
             self._verify_hash(local_path, url)
             return
         
-        # Download the file
+        # Download the file via HTTP
         r = requests.get(url, stream=True, timeout=30)
         r.raise_for_status()
         total = int(r.headers.get('content-length', 0))
@@ -141,6 +152,32 @@ class DownloadManager:
         # Track downloaded file
         with self.lock:
             self.downloaded_files.append(final_path)
+    
+    def _download_torrent(self, url, filename):
+        """Download a file using torrent."""
+        downloader = TorrentDownloader(self.target_dir)
+        
+        def progress_callback(progress, total, speed):
+            with self.lock:
+                if url in self.active_downloads:
+                    self.active_downloads[url]['progress'] = progress
+                    self.active_downloads[url]['total'] = total
+                    self.active_downloads[url]['speed'] = speed
+        
+        try:
+            # Download via torrent
+            filepath = downloader.download(url, progress_callback)
+            
+            # Verify hash if possible
+            self._verify_hash(filepath, url)
+            
+            # Track downloaded file
+            with self.lock:
+                self.downloaded_files.append(filepath)
+                
+        except Exception as e:
+            # Re-raise to be caught by worker for retry logic
+            raise RuntimeError(f"Torrent download failed: {e}") from e
     
     def _verify_hash(self, filepath, url):
         """
