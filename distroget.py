@@ -1829,12 +1829,8 @@ class DistroGetUI:
     def cleanup(self):
         """Cleanup before exit."""
         if self.download_manager:
-            # Wait for downloads to complete and show summary
-            status = self.download_manager.get_status()
-            if status['active'] or status['queued'] > 0:
-                # Downloads still in progress
-                self.download_manager.download_queue.join()
-            
+            # Stop downloads immediately without waiting
+            # (joining the queue would block the UI)
             self.download_manager.stop()
     
     def run(self):
