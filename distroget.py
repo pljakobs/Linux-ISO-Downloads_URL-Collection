@@ -1106,19 +1106,26 @@ class DistroGetUI:
     
     def on_checkbox_changed(self, checkbox, new_state, item_path):
         """Handle checkbox state changes."""
-        if new_state:
-            self.selected_items.add(item_path)
-            
-            # Queue for download if manager is active
-            if self.download_manager:
-                urls = extract_urls_for_path(self.distro_dict, item_path)
-                for url in urls:
-                    if url not in self.downloaded_items:
-                        self.download_manager.add_download(url)
-                        self.downloaded_items.add(url)
-        else:
-            self.selected_items.discard(item_path)
-        self.update_header()
+        try:
+            if new_state:
+                self.selected_items.add(item_path)
+                
+                # Queue for download if manager is active
+                if self.download_manager:
+                    urls = extract_urls_for_path(self.distro_dict, item_path)
+                    for url in urls:
+                        if url not in self.downloaded_items:
+                            self.download_manager.add_download(url)
+                            self.downloaded_items.add(url)
+            else:
+                self.selected_items.discard(item_path)
+            self.update_header()
+        except Exception as e:
+            self.show_error_dialog(
+                "Download Queue Error",
+                "Failed to queue item for download.",
+                f"Item: {item_path}\nError: {e}"
+            )
     
     def update_header(self):
         """Update the header with current info."""
@@ -1138,7 +1145,12 @@ class DistroGetUI:
         if not self.download_manager:
             return
         
-        status = self.download_manager.get_status()
+        try:
+            status = self.download_manager.get_status()
+        except Exception as e:
+            self.download_walker.clear()
+            self.download_walker.append(urwid.Text(('error', f"Error fetching status: {e}")))
+            return
         
         # Clear and rebuild
         self.download_walker.clear()
@@ -1435,46 +1447,83 @@ class DistroGetUI:
     
     def set_directory(self, directory):
         """Set the download directory and initialize manager."""
-        self.target_directory = directory
-        
-        # Add to history
-        add_to_location_history(directory)
-        
-        # Expand ~ and environment variables for local paths
-        if ':' not in self.target_directory:
-            self.target_directory = os.path.expandvars(os.path.expanduser(self.target_directory))
-            os.makedirs(self.target_directory, exist_ok=True)
-        
-        self.initialize_download_manager()
-        self.loop.widget = self.main_frame
-        self.loop.unhandled_input = self.handle_input
-        self.update_header()
-        self.update_download_panel()
+        try:
+            self.target_directory = directory
+            
+            # Add to history
+            add_to_location_history(directory)
+            
+            # Expand ~ and environment variables for local paths
+            if ':' not in self.target_directory:
+                self.target_directory = os.path.expandvars(os.path.expanduser(self.target_directory))
+                os.makedirs(self.target_directory, exist_ok=True)
+            
+            self.initialize_download_manager()
+            self.loop.widget = self.main_frame
+            self.loop.unhandled_input = self.handle_input
+            self.update_header()
+            self.update_download_panel()
+        except PermissionError as e:
+            self.show_error_dialog(
+                "Permission Denied",
+                f"Cannot create or access directory:\n{directory}",
+                f"Error: {e}"
+            )
+            self.target_directory = None
+        except OSError as e:
+            self.show_error_dialog(
+                "Directory Error",
+                f"Cannot create directory:\n{directory}",
+                f"Error: {e}"
+            )
+            self.target_directory = None
+        except Exception as e:
+            self.show_error_dialog(
+                "Unexpected Error",
+                "An error occurred while setting the download directory.",
+                f"Error: {e}"
+            )
+            self.target_directory = None
     
     def initialize_download_manager(self):
         """Initialize the download manager."""
         if not self.download_manager:
-            self.download_manager = DownloadManager(self.target_directory)
-            self.download_manager.start()
-            
-            # Queue already-selected items
-            for item_path in self.selected_items:
-                urls = extract_urls_for_path(self.distro_dict, item_path)
-                for url in urls:
-                    if url not in self.downloaded_items:
-                        self.download_manager.add_download(url)
-                        self.downloaded_items.add(url)
+            try:
+                self.download_manager = DownloadManager(self.target_directory)
+                self.download_manager.start()
+                
+                # Queue already-selected items
+                for item_path in self.selected_items:
+                    urls = extract_urls_for_path(self.distro_dict, item_path)
+                    for url in urls:
+                        if url not in self.downloaded_items:
+                            self.download_manager.add_download(url)
+                            self.downloaded_items.add(url)
+            except Exception as e:
+                self.show_error_dialog(
+                    "Download Manager Error",
+                    "Failed to initialize the download manager.",
+                    f"Error: {e}"
+                )
+                self.download_manager = None
     
     def toggle_auto_deploy(self, item_path):
         """Toggle auto-deploy marker for an item."""
-        if item_path in self.auto_deploy_items:
-            self.auto_deploy_items.discard(item_path)
-            self.config_mgr.remove_auto_deploy_item(item_path)
-        else:
-            self.auto_deploy_items.add(item_path)
-            self.config_mgr.add_auto_deploy_item(item_path)
-        
-        self.update_menu()
+        try:
+            if item_path in self.auto_deploy_items:
+                self.auto_deploy_items.discard(item_path)
+                self.config_mgr.remove_auto_deploy_item(item_path)
+            else:
+                self.auto_deploy_items.add(item_path)
+                self.config_mgr.add_auto_deploy_item(item_path)
+            
+            self.update_menu()
+        except Exception as e:
+            self.show_error_dialog(
+                "Configuration Error",
+                "Failed to update auto-deploy marker.",
+                f"Error: {e}"
+            )
     
     def show_search_dialog(self):
         """Show search dialog for finding distros."""
@@ -1616,6 +1665,52 @@ class DistroGetUI:
         self.loop.widget = overlay
         self.loop.unhandled_input = handle_dialog_input
     
+    def show_error_dialog(self, title, message, error_details=None):
+        """Show an error dialog.
+        
+        Args:
+            title: Brief error title
+            message: Main error message
+            error_details: Optional detailed error information
+        """
+        content = [
+            urwid.Text(('error', title)),
+            urwid.Divider(),
+            urwid.Text(message),
+        ]
+        
+        if error_details:
+            content.extend([
+                urwid.Divider(),
+                urwid.Text(('warning', "Details:")),
+                urwid.Text(str(error_details)),
+            ])
+        
+        content.extend([
+            urwid.Divider(),
+            urwid.Text("Press any key to close")
+        ])
+        
+        dialog = urwid.LineBox(urwid.Pile(content))
+        
+        overlay = urwid.Overlay(
+            dialog,
+            self.main_frame,
+            align='center',
+            width=('relative', 70),
+            valign='middle',
+            height=('relative', 50)
+        )
+        
+        original_input_handler = self.loop.unhandled_input
+        
+        def handle_dialog_input(key):
+            self.loop.widget = self.main_frame
+            self.loop.unhandled_input = original_input_handler
+        
+        self.loop.widget = overlay
+        self.loop.unhandled_input = handle_dialog_input
+    
     def show_clear_all_dialog(self):
         """Show confirmation dialog to clear all selections and cancel downloads."""
         selection_count = len(self.selected_items)
@@ -1746,10 +1841,31 @@ class DistroGetUI:
         """Run the UI."""
         try:
             self.loop.run()
+        except Exception as e:
+            # If we get an unhandled exception in the main loop,
+            # try to show it in a dialog if possible
+            try:
+                self.show_error_dialog(
+                    "Fatal Error",
+                    "An unexpected error occurred in the application.",
+                    f"Error: {e}\n\nThe application will now exit."
+                )
+                # Give user time to read the error
+                import time
+                time.sleep(3)
+            except:
+                # If even the error dialog fails, print to console
+                print(f"\n\nFATAL ERROR: {e}")
+                import traceback
+                traceback.print_exc()
+            raise
         finally:
             # Show summary after UI exits
-            if self.download_manager:
-                status = self.download_manager.get_status()
+            try:
+                if self.download_manager:
+                    status = self.download_manager.get_status()
+            except:
+                pass
                 print("\n" + "=" * 80)
                 print("Download Summary")
                 print("=" * 80)
