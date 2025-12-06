@@ -176,3 +176,218 @@ class TestDownloadManagerIntegration:
         # Values should differ appropriately
         assert local_status['is_remote'] is False
         assert remote_status['is_remote'] is True
+
+
+class TestHashVerificationIntegration:
+    """Test hash verification integration in DownloadManager."""
+    
+    def test_get_status_includes_hash_verification(self, tmp_path):
+        """Test that get_status() includes hash_verification dict."""
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        status = manager.get_status()
+        
+        assert 'hash_verification' in status
+        assert isinstance(status['hash_verification'], dict)
+    
+    def test_get_status_includes_failed_verifications(self, tmp_path):
+        """Test that get_status() includes failed_verifications list."""
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        status = manager.get_status()
+        
+        assert 'failed_verifications' in status
+        assert isinstance(status['failed_verifications'], list)
+    
+    def test_get_failed_verifications(self, tmp_path):
+        """Test get_failed_verifications() method."""
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        # Should return list of tuples
+        failed = manager.get_failed_verifications()
+        assert isinstance(failed, list)
+    
+    @patch('hash_verifier.HashVerifier.verify_file')
+    def test_hash_verification_on_success(self, mock_verify, tmp_path):
+        """Test hash verification is called and tracked on successful verification."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        
+        # Mock successful verification
+        test_hash = "abc123def456789012345678901234567890123456789012345678901234"
+        mock_verify.return_value = (True, "Hash verified successfully", test_hash)
+        
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.headers = {'content-length': '1024'}
+            mock_response.iter_content = lambda chunk_size: [b'test' * 256]
+            mock_get.return_value = mock_response
+            
+            manager = downloads.DownloadManager(str(target_dir))
+            manager._download_file('http://example.com/test.iso', 'test.iso')
+            
+            # Check verification was tracked
+            status = manager.get_status()
+            downloaded_file = str(target_dir / 'test.iso')
+            
+            assert downloaded_file in status['hash_verification']
+            success, message = status['hash_verification'][downloaded_file]
+            assert success is True
+            assert "verified" in message.lower()
+    
+    @patch('hash_verifier.HashVerifier.verify_file')
+    def test_hash_verification_on_failure(self, mock_verify, tmp_path):
+        """Test hash verification failure is tracked."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        
+        # Mock failed verification
+        mock_verify.return_value = (False, "Hash mismatch", None)
+        
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.headers = {'content-length': '1024'}
+            mock_response.iter_content = lambda chunk_size: [b'test' * 256]
+            mock_get.return_value = mock_response
+            
+            manager = downloads.DownloadManager(str(target_dir))
+            manager._download_file('http://example.com/test.iso', 'test.iso')
+            
+            # Check failure was tracked
+            status = manager.get_status()
+            failed = manager.get_failed_verifications()
+            
+            assert len(failed) > 0
+            filepath, message = failed[0]
+            assert 'test.iso' in filepath
+            assert "mismatch" in message.lower()
+    
+    @patch('hash_verifier.HashVerifier.verify_file')
+    def test_hash_verification_no_hash_available(self, mock_verify, tmp_path):
+        """Test handling when no hash is available."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        
+        # Mock no hash available
+        mock_verify.return_value = (None, "No hash file available", None)
+        
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.headers = {'content-length': '1024'}
+            mock_response.iter_content = lambda chunk_size: [b'test' * 256]
+            mock_get.return_value = mock_response
+            
+            manager = downloads.DownloadManager(str(target_dir))
+            manager._download_file('http://example.com/test.iso', 'test.iso')
+            
+            # Should not be in failed list
+            failed = manager.get_failed_verifications()
+            assert len(failed) == 0
+            
+            # But should be tracked in hash_verification
+            status = manager.get_status()
+            downloaded_file = str(target_dir / 'test.iso')
+            assert downloaded_file in status['hash_verification']
+            success, _ = status['hash_verification'][downloaded_file]
+            assert success is None
+    
+    def test_delete_failed_verifications(self, tmp_path):
+        """Test deleting files with failed verification."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        
+        # Create test files
+        test_file1 = target_dir / "failed1.iso"
+        test_file2 = target_dir / "failed2.iso"
+        test_file1.write_bytes(b"test1")
+        test_file2.write_bytes(b"test2")
+        
+        manager = downloads.DownloadManager(str(target_dir))
+        
+        # Manually add to failed list and hash_verification dict
+        manager.failed_verifications.append(str(test_file1))
+        manager.failed_verifications.append(str(test_file2))
+        manager.hash_verification[str(test_file1)] = (False, "Hash mismatch")
+        manager.hash_verification[str(test_file2)] = (False, "Hash mismatch")
+        
+        assert test_file1.exists()
+        assert test_file2.exists()
+        
+        # Delete failed files
+        deleted = manager.delete_failed_verifications()
+        
+        assert len(deleted) == 2
+        assert not test_file1.exists()
+        assert not test_file2.exists()
+        assert len(manager.failed_verifications) == 0
+    
+    def test_delete_failed_verifications_missing_file(self, tmp_path):
+        """Test deleting failed verifications when file already missing."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        
+        manager = downloads.DownloadManager(str(target_dir))
+        
+        # Add non-existent file to failed list
+        fake_file = str(target_dir / "nonexistent.iso")
+        manager.failed_verifications.append(fake_file)
+        manager.hash_verification[fake_file] = (False, "Hash mismatch")
+        
+        # Should not crash
+        deleted = manager.delete_failed_verifications()
+        
+        # Should still clear the list even if file doesn't exist
+        assert len(manager.failed_verifications) == 0
+    
+    def test_ui_can_check_verification_status(self, tmp_path):
+        """Test that UI can check verification status per file.
+        
+        Simulates the TUI code checking verification status:
+        verification = status.get('hash_verification', {}).get(filepath, (None, ''))
+        """
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        # Add some mock verification data
+        test_file = "/path/to/test.iso"
+        manager.hash_verification[test_file] = (True, "Verified successfully")
+        
+        status = manager.get_status()
+        
+        # Simulate UI access pattern
+        verification = status.get('hash_verification', {}).get(test_file, (None, ''))
+        
+        assert verification[0] is True
+        assert "verified" in verification[1].lower()
+    
+    def test_verification_counts_for_ui(self, tmp_path):
+        """Test counting verified/failed files for UI display.
+        
+        Simulates the TUI code counting verifications:
+        verified_count = sum(1 for f in files if status['hash_verification'].get(f, (None,))[0] is True)
+        """
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        # Add mock data
+        files = ["/path/file1.iso", "/path/file2.iso", "/path/file3.iso"]
+        manager.hash_verification[files[0]] = (True, "OK")
+        manager.hash_verification[files[1]] = (False, "Failed")
+        manager.hash_verification[files[2]] = (None, "No hash")
+        
+        status = manager.get_status()
+        
+        # Count like UI does
+        verified_count = sum(1 for f in files 
+                           if status['hash_verification'].get(f, (None,))[0] is True)
+        failed_count = sum(1 for f in files 
+                         if status['hash_verification'].get(f, (None,))[0] is False)
+        
+        assert verified_count == 1
+        assert failed_count == 1

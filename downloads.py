@@ -13,6 +13,7 @@ import bz2
 import gzip
 import zipfile
 import tarfile
+from hash_verifier import HashVerifier
 
 
 class DownloadManager:
@@ -39,6 +40,8 @@ class DownloadManager:
         self.workers = []
         self.running = True
         self.downloaded_files = []  # Track successfully downloaded files
+        self.hash_verification = {}  # Track hash verification status: {filepath: (success, message)}
+        self.failed_verifications = []  # Track files with failed verification
         
     def start(self):
         """Start download worker threads."""
@@ -103,6 +106,8 @@ class DownloadManager:
                 self.completed.add(url)
                 self.completed_urls.add(url)
                 self.downloaded_files.append(local_path)
+            # Verify existing file
+            self._verify_hash(local_path, url)
             return
         
         # Download the file
@@ -121,12 +126,50 @@ class DownloadManager:
                             self.active_downloads[url]['progress'] = downloaded
                             self.active_downloads[url]['total'] = total
         
-        # Decompress if needed
-        decompressed_path = self._decompress_if_needed(local_path)
+        # Verify hash BEFORE decompression
+        self._verify_hash(local_path, url)
         
-        # Track downloaded file (use decompressed path if available)
+        # Decompress if needed (only after successful verification or if no hash available)
+        final_path = local_path
+        verification = self.hash_verification.get(local_path)
+        if verification is None or verification[0] is not False:  # Proceed if verified or no hash
+            decompressed_path = self._decompress_if_needed(local_path)
+            if decompressed_path:
+                final_path = decompressed_path
+        
+        # Track downloaded file
         with self.lock:
-            self.downloaded_files.append(decompressed_path if decompressed_path else local_path)
+            self.downloaded_files.append(final_path)
+    
+    def _verify_hash(self, filepath, url):
+        """
+        Verify file hash and update verification status.
+        
+        Args:
+            filepath: Path to the downloaded file
+            url: Original download URL
+        """
+        try:
+            success, message, computed_hash = HashVerifier.verify_file(filepath, iso_url=url)
+            
+            with self.lock:
+                self.hash_verification[filepath] = (success, message)
+                
+                if success is False:
+                    # Hash verification failed
+                    self.failed_verifications.append(filepath)
+                    print(f"\n✗ Hash verification FAILED for {os.path.basename(filepath)}")
+                    print(f"  {message}")
+                elif success is True:
+                    # Hash verification successful
+                    print(f"\n✓ Hash verified for {os.path.basename(filepath)}")
+                # success is None means no hash available - silent
+                
+        except Exception as e:
+            # Don't fail download on verification error
+            print(f"\n⚠ Hash verification error for {os.path.basename(filepath)}: {e}")
+            with self.lock:
+                self.hash_verification[filepath] = (None, f"Verification error: {e}")
     
     def _decompress_if_needed(self, filepath):
         """Decompress file if it's a compressed format. Returns new path or None."""
@@ -246,8 +289,43 @@ class DownloadManager:
                 'retry_counts': dict(self.retry_counts),
                 'queued': self.download_queue.qsize(),
                 'downloaded_files': list(self.downloaded_files),
-                'is_remote': False
+                'is_remote': False,
+                'hash_verification': dict(self.hash_verification),
+                'failed_verifications': list(self.failed_verifications)
             }
+    
+    def get_failed_verifications(self):
+        """Get list of files that failed hash verification with their messages.
+        
+        Returns:
+            List of tuples (filepath, message) for failed verifications
+        """
+        with self.lock:
+            result = []
+            for filepath in self.failed_verifications:
+                # Get the message from hash_verification dict
+                _, message = self.hash_verification.get(filepath, (None, "Unknown error"))
+                result.append((filepath, message))
+            return result
+    
+    def delete_failed_verifications(self):
+        """Delete all files that failed hash verification."""
+        with self.lock:
+            deleted = []
+            for filepath in self.failed_verifications:
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                        deleted.append(filepath)
+                        # Remove from downloaded_files list
+                        if filepath in self.downloaded_files:
+                            self.downloaded_files.remove(filepath)
+                except Exception as e:
+                    print(f"Error deleting {filepath}: {e}")
+            
+            # Clear the failed verifications list
+            self.failed_verifications.clear()
+            return deleted
     
     def stop(self):
         """Stop all workers."""

@@ -178,6 +178,88 @@ def show_password_popup(stdscr, prompt="Enter SSH password:"):
     
     return None
 
+def show_failed_verification_popup(stdscr, download_manager):
+    """Show a popup for files that failed hash verification and allow deletion."""
+    failed_files = download_manager.get_failed_verifications()
+    
+    if not failed_files:
+        return
+    
+    max_y, max_x = stdscr.getmaxyx()
+    height = min(len(failed_files) + 10, max_y - 4)
+    width = min(max_x - 4, 80)
+    start_y = (max_y - height) // 2
+    start_x = (max_x - width) // 2
+    
+    # Create popup window
+    popup = curses.newwin(height, width, start_y, start_x)
+    popup.keypad(True)
+    
+    while True:
+        popup.clear()
+        popup.border()
+        
+        # Title
+        title = " Hash Verification Failed "
+        title_x = max(1, (width - len(title)) // 2)
+        popup.attron(curses.color_pair(4) | curses.A_BOLD)
+        popup.addstr(0, title_x, title)
+        popup.attroff(curses.color_pair(4) | curses.A_BOLD)
+        
+        # Warning message
+        popup.addstr(2, 2, "The following files failed hash verification:", curses.color_pair(4))
+        popup.addstr(3, 2, "These files may be corrupted or incomplete.", curses.A_DIM)
+        
+        # List failed files
+        y_pos = 5
+        for i, (filepath, message) in enumerate(failed_files[:height - 12]):
+            filename = os.path.basename(filepath)[:width - 6]
+            popup.attron(curses.color_pair(4))
+            popup.addstr(y_pos + i, 3, f"✗ {filename}")
+            popup.attroff(curses.color_pair(4))
+        
+        if len(failed_files) > height - 12:
+            popup.addstr(y_pos + height - 12, 3, f"... and {len(failed_files) - (height - 12)} more")
+        
+        # Options
+        options_y = height - 5
+        popup.addstr(options_y, 2, "What would you like to do?", curses.A_BOLD)
+        popup.addstr(options_y + 1, 3, "[D] Delete all failed files")
+        popup.addstr(options_y + 2, 3, "[K] Keep files (ignore verification)")
+        popup.addstr(options_y + 3, 2, "Press D or K to choose", curses.A_DIM)
+        
+        popup.refresh()
+        
+        key = popup.getch()
+        
+        if key in [ord('d'), ord('D')]:
+            # Confirm deletion
+            popup.clear()
+            popup.border()
+            popup.addstr(0, title_x, title, curses.color_pair(4) | curses.A_BOLD)
+            popup.addstr(height // 2 - 1, 2, "Delete all failed files?", curses.A_BOLD)
+            popup.addstr(height // 2 + 1, 2, "[Y] Yes, delete them")
+            popup.addstr(height // 2 + 2, 2, "[N] No, go back")
+            popup.refresh()
+            
+            confirm_key = popup.getch()
+            if confirm_key in [ord('y'), ord('Y')]:
+                # Perform deletion
+                deleted = download_manager.delete_failed_verifications()
+                
+                # Show confirmation
+                popup.clear()
+                popup.border()
+                popup.addstr(0, title_x, " Deletion Complete ", curses.color_pair(2) | curses.A_BOLD)
+                popup.addstr(height // 2, 2, f"Deleted {len(deleted)} file(s)", curses.color_pair(2))
+                popup.addstr(height // 2 + 2, 2, "Press any key to continue...", curses.A_DIM)
+                popup.refresh()
+                popup.getch()
+                return
+            # else go back to main menu (continue loop)
+        elif key in [ord('k'), ord('K'), 27]:  # K or ESC
+            return
+
 def get_repo_url():
     """Get the repository URL based on user preference."""
     config = load_config()
@@ -730,7 +812,7 @@ def curses_menu(stdscr, distro_dict):
         
         # Draw header
         dest_info = f" | Dest: {target_directory}" if target_directory else ""
-        header = f"Navigate: ↑↓, Select: SPACE, Enter/→: Enter, ←/ESC: Back, /: Search, a: Auto-deploy, A: All, D: Set Dir, Q: Quit"
+        header = f"Navigate: ↑↓, Select: SPACE, Enter/→: Enter, ←/ESC: Back, /: Search, a: Auto-deploy, A: All, D: Set Dir, V: View failed, Q: Quit"
         stdscr.addstr(0, 0, header[:width-1])
         
         # Draw path/search line
@@ -850,14 +932,40 @@ def curses_menu(stdscr, distro_dict):
                 
                 if transfer_status == 'pending':
                     if status['downloaded_files']:
-                        stdscr.addstr(scp_y, left_width + 2, f"Ready: {len(status['downloaded_files'])} file(s)"[:right_width-3])
+                        verified_count = sum(1 for f in status['downloaded_files'] 
+                                           if status.get('hash_verification', {}).get(f, (None,))[0] is True)
+                        failed_count = sum(1 for f in status['downloaded_files']
+                                         if status.get('hash_verification', {}).get(f, (None,))[0] is False)
+                        
+                        ready_text = f"Ready: {len(status['downloaded_files'])} file(s)"
+                        if verified_count > 0 or failed_count > 0:
+                            ready_text += f" (✓{verified_count}"
+                            if failed_count > 0:
+                                ready_text += f" ✗{failed_count}"
+                            ready_text += ")"
+                        stdscr.addstr(scp_y, left_width + 2, ready_text[:right_width-3])
                         scp_y += 1
-                        # Show downloaded files waiting for transfer
+                        
+                        # Show downloaded files waiting for transfer with verification status
                         for filepath in status['downloaded_files'][:height - scp_y - 2]:
-                            filename = os.path.basename(filepath)[:right_width-5]
-                            stdscr.attron(curses.color_pair(2))
-                            stdscr.addstr(scp_y, left_width + 2, f"✓ {filename}"[:right_width-3])
-                            stdscr.attroff(curses.color_pair(2))
+                            filename = os.path.basename(filepath)[:right_width-8]
+                            verification = status.get('hash_verification', {}).get(filepath, (None, ''))
+                            
+                            if verification[0] is True:
+                                # Verified successfully - green checkmark
+                                stdscr.attron(curses.color_pair(2))
+                                stdscr.addstr(scp_y, left_width + 2, f"✓ {filename}"[:right_width-3])
+                                stdscr.attroff(curses.color_pair(2))
+                            elif verification[0] is False:
+                                # Verification failed - red X
+                                stdscr.attron(curses.color_pair(4))
+                                stdscr.addstr(scp_y, left_width + 2, f"✗ {filename}"[:right_width-3])
+                                stdscr.attroff(curses.color_pair(4))
+                            else:
+                                # No verification available - regular checkmark
+                                stdscr.attron(curses.color_pair(2))
+                                stdscr.addstr(scp_y, left_width + 2, f"• {filename}"[:right_width-3])
+                                stdscr.attroff(curses.color_pair(2))
                             scp_y += 1
                     else:
                         stdscr.addstr(scp_y, left_width + 2, "Waiting..."[:right_width-3])
@@ -1300,6 +1408,11 @@ def curses_menu(stdscr, distro_dict):
                 menu_stack.pop()
                 current_row = row_stack.pop() if row_stack else 0
                 scroll_offset = 0
+        elif key in [ord('v'), ord('V')]:
+            # View and handle failed hash verifications
+            if download_manager:
+                show_failed_verification_popup(stdscr, download_manager)
+                needs_redraw = True
         elif key in [ord('q'), ord('Q')]:
             break
     # Return selected items mapped to actual URLs
@@ -1389,6 +1502,31 @@ def curses_menu(stdscr, distro_dict):
                 print("No files were downloaded (all may already exist)")
             
             print("=" * 80)
+            
+            # Check for hash verification failures
+            failed_verifications = download_manager.get_failed_verifications()
+            if failed_verifications:
+                print("\n" + "=" * 80)
+                print("Hash Verification Failed")
+                print("=" * 80)
+                print(f"\n⚠ {len(failed_verifications)} file(s) failed hash verification:")
+                print("These files may be corrupted or incomplete.\n")
+                
+                for filepath, message in failed_verifications:
+                    filename = os.path.basename(filepath)
+                    print(f"  ✗ {filename}")
+                    print(f"    {message}")
+                
+                print("\n" + "-" * 80)
+                response = input("Delete all failed files? [y/N]: ").strip().lower()
+                
+                if response in ['y', 'yes']:
+                    deleted = download_manager.delete_failed_verifications()
+                    print(f"\n✓ Deleted {len(deleted)} file(s)")
+                else:
+                    print("\n⚠ Files kept (you may want to re-download them)")
+                
+                print("=" * 80)
     
     return final_urls, target_directory
 
