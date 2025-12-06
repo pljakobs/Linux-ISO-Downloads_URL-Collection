@@ -194,7 +194,7 @@ The following distributions are automatically updated with the latest versions:
 - [Alpine 3.23.0](https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso)
 
 ## Endless OS
-- [Endless OS](https://images-dl.endlessm.com/torrents/eos-eos3.9-amd64-amd64.211103-113242.base.iso.torrent)
+- [Endless OS](https://images-dl.endlessm.com/torrents/eos-eos3.9-amd64-amd64.211103-113242.base.iso.torrent) ⚠️ *Note: This torrent URL currently returns HTTP 403 (Forbidden)*
 
 ## CentOS
 - [CentOS 8.4](https://isoredirect.centos.org/centos/8/isos/x86_64/CentOS-8.4.2105-x86_64-dvd1.iso)

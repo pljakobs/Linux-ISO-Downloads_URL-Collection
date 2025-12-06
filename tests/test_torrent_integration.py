@@ -4,6 +4,9 @@ Integration test for torrent downloads using real torrent URLs.
 
 This test requires aria2c to be installed and will actually download
 a small portion of a real torrent to verify the complete workflow.
+
+NOTE: The Endless OS torrent URL currently returns HTTP 403 (Forbidden).
+Tests will skip if the URL is not accessible.
 """
 
 import sys
@@ -15,12 +18,23 @@ import unittest
 import tempfile
 import shutil
 import time
+import requests
 from unittest.mock import patch
 from torrent_downloader import TorrentDownloader
 
 
 # Real torrent URL from README.md
+# NOTE: This URL currently returns HTTP 403 (server blocks access)
 ENDLESS_OS_TORRENT = "https://images-dl.endlessm.com/torrents/eos-eos3.9-amd64-amd64.211103-113242.base.iso.torrent"
+
+
+def is_url_accessible(url):
+    """Check if URL is accessible (not 403/404)."""
+    try:
+        response = requests.head(url, allow_redirects=True, timeout=5)
+        return response.status_code == 200
+    except:
+        return False
 
 
 class TestRealTorrentDownload(unittest.TestCase):
@@ -29,6 +43,7 @@ class TestRealTorrentDownload(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
+        self.url_accessible = is_url_accessible(ENDLESS_OS_TORRENT)
     
     def tearDown(self):
         """Clean up test fixtures."""
@@ -61,6 +76,9 @@ class TestRealTorrentDownload(unittest.TestCase):
     @unittest.skipUnless(TorrentDownloader.is_available(), "aria2c not installed")
     def test_download_torrent_metadata_only(self):
         """Test downloading just the torrent metadata (stop immediately)."""
+        if not self.url_accessible:
+            self.skipTest(f"Torrent URL not accessible (HTTP 403): {ENDLESS_OS_TORRENT}")
+        
         downloader = TorrentDownloader(self.temp_dir)
         
         progress_updates = []
@@ -97,6 +115,7 @@ class TestTorrentIntegrationWithDownloadManager(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
+        self.url_accessible = is_url_accessible(ENDLESS_OS_TORRENT)
     
     def tearDown(self):
         """Clean up test fixtures."""
@@ -109,7 +128,7 @@ class TestTorrentIntegrationWithDownloadManager(unittest.TestCase):
         from downloads import DownloadManager
         
         # This test verifies URL detection and routing, not the actual download
-        # (real download might fail due to network/seeders)
+        # (real download might fail due to network/seeders/HTTP 403)
         
         # Just verify detection works
         self.assertTrue(TorrentDownloader.is_torrent_url(ENDLESS_OS_TORRENT))
@@ -120,13 +139,17 @@ class TestTorrentIntegrationWithDownloadManager(unittest.TestCase):
         
         try:
             # The URL should be accepted (queued)
-            # Whether it actually downloads depends on network/seeders
+            # Whether it actually downloads depends on network/seeders/accessibility
             manager.add_download(ENDLESS_OS_TORRENT)
             time.sleep(0.2)
             
             # Just verify manager is still running and didn't crash
             status = manager.get_status()
             self.assertIsNotNone(status)
+            
+            # If URL is not accessible, expect it to fail (which is correct behavior)
+            if not self.url_accessible:
+                print(f"\n⚠️  Torrent URL returned HTTP 403 - expected failure")
             
             print(f"\n✓ DownloadManager handled torrent URL without crashing")
             print(f"  Status: {status['completed']} completed, {status['failed']} failed, {status['queued']} queued")
