@@ -13,8 +13,12 @@ import bz2
 import gzip
 import zipfile
 import tarfile
+import logging
 from hash_verifier import HashVerifier
 from torrent_downloader import TorrentDownloader
+
+# Set up logger
+logger = logging.getLogger('distroget.downloads')
 
 
 class DownloadManager:
@@ -54,9 +58,11 @@ class DownloadManager:
     
     def _worker(self):
         """Worker thread that processes downloads."""
+        logger.debug(f"Worker thread starting")
         while self.running:
             try:
                 url = self.download_queue.get(timeout=0.5)
+                logger.info(f"Worker picked up download: {url}")
             except queue.Empty:
                 continue
             
@@ -70,6 +76,7 @@ class DownloadManager:
             
             try:
                 self._download_file(url, filename)
+                logger.info(f"Download completed successfully: {filename}")
                 with self.lock:
                     self.completed.add(url)
                     self.completed_urls.add(url)
@@ -79,18 +86,21 @@ class DownloadManager:
                     if url in self.retry_counts:
                         del self.retry_counts[url]
             except Exception as e:
+                logger.error(f"Download failed for {url}: {e}")
                 with self.lock:
                     # Get current retry count
                     retry_count = self.retry_counts.get(url, 0)
                     
                     if retry_count < self.max_retries:
                         # Retry the download
+                        logger.info(f"Retrying download {retry_count + 1}/{self.max_retries}: {url}")
                         self.retry_counts[url] = retry_count + 1
                         # Re-queue with delay (exponential backoff)
                         time.sleep(2 ** retry_count)  # 1s, 2s, 4s delays
                         self.download_queue.put(url)
                     else:
                         # Max retries exceeded
+                        logger.error(f"Max retries exceeded for {url}")
                         self.failed.add(url)
                     
                     if url in self.active_downloads:
@@ -102,10 +112,13 @@ class DownloadManager:
         """Download a single file with progress tracking."""
         # Check if this is a torrent and if aria2c is available
         if TorrentDownloader.is_torrent_url(url):
+            logger.info(f"Detected torrent URL: {url}")
             if TorrentDownloader.is_available():
+                logger.info(f"aria2c available, using torrent download")
                 return self._download_torrent(url, filename)
             else:
                 # Torrent URL but no aria2c - skip or fail gracefully
+                logger.error(f"aria2c not available for torrent: {url}")
                 raise RuntimeError(
                     f"Torrent download not supported (aria2c not installed): {filename}"
                 )
@@ -155,9 +168,14 @@ class DownloadManager:
     
     def _download_torrent(self, url, filename):
         """Download a file using torrent."""
+        logger.info(f"Starting torrent download for: {filename}")
+        logger.debug(f"Torrent URL: {url}")
+        logger.debug(f"Target directory: {self.target_dir}")
+        
         downloader = TorrentDownloader(self.target_dir)
         
         def progress_callback(progress, total, speed):
+            logger.debug(f"Torrent progress - downloaded: {progress}/{total} bytes, speed: {speed}")
             with self.lock:
                 if url in self.active_downloads:
                     self.active_downloads[url]['progress'] = progress
@@ -166,7 +184,9 @@ class DownloadManager:
         
         try:
             # Download via torrent
+            logger.debug(f"Calling TorrentDownloader.download()")
             filepath = downloader.download(url, progress_callback)
+            logger.info(f"Torrent download completed: {filepath}")
             
             # Verify hash if possible
             self._verify_hash(filepath, url)
@@ -176,6 +196,7 @@ class DownloadManager:
                 self.downloaded_files.append(filepath)
                 
         except Exception as e:
+            logger.exception(f"Torrent download failed for {filename}: {e}")
             # Re-raise to be caught by worker for retry logic
             raise RuntimeError(f"Torrent download failed: {e}") from e
     
@@ -328,7 +349,9 @@ class DownloadManager:
     
     def add_download(self, url):
         """Add a URL to the download queue."""
+        logger.info(f"Adding download to queue: {url}")
         self.download_queue.put(url)
+        logger.debug(f"Queue size: {self.download_queue.qsize()}")
     
     def get_status(self):
         """Get current download status for progress display."""

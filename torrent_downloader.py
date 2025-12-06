@@ -8,7 +8,11 @@ import os
 import subprocess
 import re
 import shutil
+import logging
 from threading import Lock
+
+# Set up logger
+logger = logging.getLogger('distroget.torrent')
 
 
 class TorrentDownloader:
@@ -77,7 +81,10 @@ class TorrentDownloader:
             RuntimeError: If aria2c is not available
             subprocess.CalledProcessError: If download fails
         """
+        logger.info(f"Starting torrent download: {url}")
+        
         if not self.is_available():
+            logger.error("aria2c is not available")
             raise RuntimeError("aria2c is not installed. Install it to enable torrent downloads.")
         
         # aria2c options:
@@ -102,6 +109,7 @@ class TorrentDownloader:
         ]
         
         try:
+            logger.debug(f"Running command: {' '.join(cmd)}")
             self.process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -112,6 +120,7 @@ class TorrentDownloader:
             
             # Parse output for progress
             for line in self.process.stdout:
+                logger.debug(f"aria2c output: {line.strip()}")
                 self._parse_progress(line)
                 
                 if progress_callback:
@@ -121,7 +130,10 @@ class TorrentDownloader:
             return_code = self.process.wait()
             
             if return_code != 0:
+                logger.error(f"aria2c failed with return code {return_code}")
                 raise subprocess.CalledProcessError(return_code, cmd)
+            
+            logger.info(f"Torrent download completed successfully")
             
             # Find the downloaded file
             filename = self._extract_filename(url)
@@ -135,6 +147,7 @@ class TorrentDownloader:
                 raise FileNotFoundError(f"Downloaded file not found: {filepath}")
                 
         except Exception as e:
+            logger.exception(f"Torrent download failed: {e}")
             if self.process:
                 self.process.kill()
             raise

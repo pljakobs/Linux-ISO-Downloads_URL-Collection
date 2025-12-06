@@ -5,6 +5,7 @@ import os
 import requests
 import sys
 import time
+import logging
 from pathlib import Path
 from urllib.parse import urlparse
 from updaters import DISTRO_UPDATERS
@@ -12,7 +13,11 @@ from downloads import DownloadManager
 from transfers import TransferManager, CombinedDownloadTransferManager
 from proxmox import ProxmoxTarget, detect_file_type, select_storage_interactive
 from config_manager import ConfigManager
+from logger_config import setup_logging, get_log_file
 import datetime
+
+# Set up logging
+logger = logging.getLogger('distroget.main')
 
 # URL of the GitHub raw text file
 ISO_LIST_URL = "https://raw.githubusercontent.com/pljakobs/Linux-ISO-Downloads_URL-Collection/main/README.md"
@@ -1115,6 +1120,7 @@ class DistroGetUI:
                     urls = extract_urls_for_path(self.distro_dict, item_path)
                     for url in urls:
                         if url not in self.downloaded_items:
+                            logger.info(f"Queueing download: {url}")
                             self.download_manager.add_download(url)
                             self.downloaded_items.add(url)
             else:
@@ -2931,6 +2937,10 @@ def update_only_mode():
         sys.exit(0)
 
 if __name__ == "__main__":
+    # Initialize logging (INFO level for debug, change to WARNING for production)
+    log_file = setup_logging(log_level=logging.DEBUG)
+    logger.info(f"distroget starting - log file: {log_file}")
+    
     # Check for command-line flags
     if len(sys.argv) > 1:
         if sys.argv[1] == '--update-only':
