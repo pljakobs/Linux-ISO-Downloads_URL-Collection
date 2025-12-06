@@ -391,3 +391,170 @@ class TestHashVerificationIntegration:
         
         assert verified_count == 1
         assert failed_count == 1
+
+
+class TestDownloadLogging:
+    """Test download history and logging functionality."""
+    
+    def test_download_history_tracked(self, tmp_path):
+        """Test that download history is tracked."""
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        assert hasattr(manager, 'download_history')
+        assert isinstance(manager.download_history, list)
+    
+    @patch('hash_verifier.HashVerifier.verify_file')
+    def test_history_entry_created_on_download(self, mock_verify, tmp_path):
+        """Test that history entry is created when file is downloaded."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        
+        # Mock successful verification
+        test_hash = "1b4f0e9851971998e732078544c96b36c3d01cedf7caa332359d6f1d83567014"
+        mock_verify.return_value = (True, "Hash verified successfully", test_hash)
+        
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.headers = {'content-length': '1024'}
+            mock_response.iter_content = lambda chunk_size: [b'test' * 256]
+            mock_get.return_value = mock_response
+            
+            manager = downloads.DownloadManager(str(target_dir))
+            manager._download_file('http://example.com/test.iso', 'test.iso')
+            
+            # Check history entry was created
+            assert len(manager.download_history) == 1
+            entry = manager.download_history[0]
+            
+            assert 'url' in entry
+            assert 'filepath' in entry
+            assert 'filename' in entry
+            assert 'size' in entry
+            assert 'hash_verified' in entry
+            assert 'verification_message' in entry
+            assert 'timestamp' in entry
+            assert 'target_dir' in entry
+            
+            assert entry['url'] == 'http://example.com/test.iso'
+            assert entry['filename'] == 'test.iso'
+            assert entry['hash_verified'] is True
+    
+    def test_get_download_log_empty(self, tmp_path):
+        """Test getting log when no downloads."""
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        log = manager.get_download_log()
+        
+        assert "No downloads recorded" in log
+    
+    def test_get_download_log_with_entries(self, tmp_path):
+        """Test getting log with download entries."""
+        target_dir = str(tmp_path / "downloads")
+        manager = downloads.DownloadManager(target_dir)
+        
+        # Add mock history entries
+        import datetime
+        manager.download_history.append({
+            'url': 'http://example.com/test1.iso',
+            'filepath': '/path/to/test1.iso',
+            'filename': 'test1.iso',
+            'size': 1024000,
+            'hash_verified': True,
+            'verification_message': 'Hash verified successfully',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'target_dir': target_dir
+        })
+        manager.download_history.append({
+            'url': 'http://example.com/test2.iso',
+            'filepath': '/path/to/test2.iso',
+            'filename': 'test2.iso',
+            'size': 2048000,
+            'hash_verified': False,
+            'verification_message': 'Hash mismatch',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'target_dir': target_dir
+        })
+        
+        log = manager.get_download_log()
+        
+        # Check log contains expected content
+        assert "DOWNLOAD LOG" in log
+        assert "test1.iso" in log
+        assert "test2.iso" in log
+        assert "✓ PASSED" in log
+        assert "✗ FAILED" in log
+        assert "SUMMARY" in log
+        assert "Total files downloaded: 2" in log
+        assert "Hash verified: 1" in log
+        assert "Hash failed: 1" in log
+    
+    def test_save_download_log(self, tmp_path):
+        """Test saving log to file."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        
+        manager = downloads.DownloadManager(str(target_dir))
+        
+        # Add a mock entry
+        import datetime
+        manager.download_history.append({
+            'url': 'http://example.com/test.iso',
+            'filepath': str(target_dir / 'test.iso'),
+            'filename': 'test.iso',
+            'size': 1024000,
+            'hash_verified': True,
+            'verification_message': 'Hash verified',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'target_dir': str(target_dir)
+        })
+        
+        # Save log
+        log_file = manager.save_download_log()
+        
+        assert log_file is not None
+        assert os.path.exists(log_file)
+        assert log_file.startswith(str(target_dir))
+        assert 'download_log_' in log_file
+        
+        # Check file content
+        with open(log_file, 'r') as f:
+            content = f.read()
+            assert "DOWNLOAD LOG" in content
+            assert "test.iso" in content
+    
+    def test_save_download_log_custom_path(self, tmp_path):
+        """Test saving log to custom path."""
+        target_dir = tmp_path / "downloads"
+        target_dir.mkdir()
+        custom_log = tmp_path / "custom_log.txt"
+        
+        manager = downloads.DownloadManager(str(target_dir))
+        
+        # Add a mock entry
+        import datetime
+        manager.download_history.append({
+            'url': 'http://example.com/test.iso',
+            'filepath': str(target_dir / 'test.iso'),
+            'filename': 'test.iso',
+            'size': 1024,
+            'hash_verified': None,
+            'verification_message': 'No hash available',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'target_dir': str(target_dir)
+        })
+        
+        # Save to custom path
+        log_file = manager.save_download_log(str(custom_log))
+        
+        assert log_file == str(custom_log)
+        assert os.path.exists(custom_log)
+    
+    def test_format_size_helper(self):
+        """Test the _format_size helper method."""
+        assert downloads.DownloadManager._format_size(500) == "500.00 B"
+        assert downloads.DownloadManager._format_size(1024) == "1.00 KB"
+        assert downloads.DownloadManager._format_size(1024 * 1024) == "1.00 MB"
+        assert downloads.DownloadManager._format_size(1024 * 1024 * 1024) == "1.00 GB"

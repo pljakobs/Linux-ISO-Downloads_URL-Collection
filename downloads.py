@@ -42,6 +42,7 @@ class DownloadManager:
         self.downloaded_files = []  # Track successfully downloaded files
         self.hash_verification = {}  # Track hash verification status: {filepath: (success, message)}
         self.failed_verifications = []  # Track files with failed verification
+        self.download_history = []  # Track detailed history: {url, filepath, size, hash_verified, timestamp, etc}
         
     def start(self):
         """Start download worker threads."""
@@ -164,6 +165,20 @@ class DownloadManager:
                     # Hash verification successful
                     print(f"\n✓ Hash verified for {os.path.basename(filepath)}")
                 # success is None means no hash available - silent
+                
+                # Add to download history
+                import datetime
+                file_size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+                self.download_history.append({
+                    'url': url,
+                    'filepath': filepath,
+                    'filename': os.path.basename(filepath),
+                    'size': file_size,
+                    'hash_verified': success,
+                    'verification_message': message,
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'target_dir': self.target_dir
+                })
                 
         except Exception as e:
             # Don't fail download on verification error
@@ -326,6 +341,93 @@ class DownloadManager:
             # Clear the failed verifications list
             self.failed_verifications.clear()
             return deleted
+    
+    def get_download_log(self):
+        """Generate a formatted download log summary.
+        
+        Returns:
+            String containing formatted download log
+        """
+        with self.lock:
+            if not self.download_history:
+                return "No downloads recorded."
+            
+            log_lines = []
+            log_lines.append("=" * 80)
+            log_lines.append("DOWNLOAD LOG")
+            log_lines.append("=" * 80)
+            log_lines.append("")
+            
+            for entry in self.download_history:
+                log_lines.append(f"File: {entry['filename']}")
+                log_lines.append(f"  Location: {entry['filepath']}")
+                log_lines.append(f"  Size: {self._format_size(entry['size'])}")
+                
+                # Hash verification status
+                if entry['hash_verified'] is True:
+                    log_lines.append(f"  Hash Verification: ✓ PASSED")
+                elif entry['hash_verified'] is False:
+                    log_lines.append(f"  Hash Verification: ✗ FAILED")
+                    log_lines.append(f"    Reason: {entry['verification_message']}")
+                else:
+                    log_lines.append(f"  Hash Verification: ⚠ Not available")
+                
+                log_lines.append(f"  Downloaded: {entry['timestamp']}")
+                log_lines.append(f"  Source: {entry['url']}")
+                log_lines.append("")
+            
+            # Summary
+            total = len(self.download_history)
+            verified = sum(1 for e in self.download_history if e['hash_verified'] is True)
+            failed = sum(1 for e in self.download_history if e['hash_verified'] is False)
+            no_hash = sum(1 for e in self.download_history if e['hash_verified'] is None)
+            total_size = sum(e['size'] for e in self.download_history)
+            
+            log_lines.append("-" * 80)
+            log_lines.append("SUMMARY")
+            log_lines.append("-" * 80)
+            log_lines.append(f"Total files downloaded: {total}")
+            log_lines.append(f"  ✓ Hash verified: {verified}")
+            log_lines.append(f"  ✗ Hash failed: {failed}")
+            log_lines.append(f"  ⚠ No hash available: {no_hash}")
+            log_lines.append(f"Total size: {self._format_size(total_size)}")
+            log_lines.append(f"Target directory: {self.target_dir}")
+            log_lines.append("=" * 80)
+            
+            return "\n".join(log_lines)
+    
+    def save_download_log(self, log_file=None):
+        """Save download log to a file.
+        
+        Args:
+            log_file: Path to log file. If None, saves to target_dir/download_log.txt
+        
+        Returns:
+            Path to the saved log file
+        """
+        if log_file is None:
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file = os.path.join(self.target_dir, f"download_log_{timestamp}.txt")
+        
+        log_content = self.get_download_log()
+        
+        try:
+            with open(log_file, 'w') as f:
+                f.write(log_content)
+            return log_file
+        except Exception as e:
+            print(f"Error saving log file: {e}")
+            return None
+    
+    @staticmethod
+    def _format_size(bytes_size):
+        """Format bytes into human-readable size."""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if bytes_size < 1024.0:
+                return f"{bytes_size:.2f} {unit}"
+            bytes_size /= 1024.0
+        return f"{bytes_size:.2f} PB"
     
     def stop(self):
         """Stop all workers."""

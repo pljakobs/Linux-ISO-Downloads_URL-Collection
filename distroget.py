@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import curses
+import urwid
 import json
 import os
 import requests
@@ -758,6 +758,1023 @@ def extract_urls_for_path(distro_dict, item_path):
             return []
     
     return extract_urls_from_node(current_node)
+
+# ============================================================================
+# Urwid UI Components
+# ============================================================================
+
+class SelectableText(urwid.Text):
+    """Text widget that can be selected."""
+    
+    def selectable(self):
+        return True
+    
+    def keypress(self, size, key):
+        return key
+
+
+class DistroCheckBox(urwid.CheckBox):
+    """Enhanced checkbox for distro selection."""
+    
+    def __init__(self, label, state=False, path="", has_children=False, item_name="", indent=0):
+        super().__init__(label, state=state)
+        self.path = path
+        self.has_children = has_children
+        self.is_auto_deploy = False
+        self.item_name = item_name
+        self.indent = indent
+    
+    def set_auto_deploy(self, value):
+        self.is_auto_deploy = value
+        self._invalidate()
+
+
+class DownloadStatusWidget(urwid.WidgetWrap):
+    """Widget to display download status with progress."""
+    
+    def __init__(self, filename, total=0):
+        self.filename = filename
+        self.total = total
+        self.progress = 0
+        self.status = "queued"
+        
+        self.text = urwid.Text("")
+        self.progress_bar = urwid.ProgressBar('pg_normal', 'pg_complete', 0, total or 100)
+        
+        pile = urwid.Pile([
+            urwid.Text(('filename', filename)),
+            self.progress_bar,
+            self.text
+        ])
+        
+        super().__init__(pile)
+        self.update_display()
+    
+    def update_display(self):
+        """Update the display based on current status."""
+        if self.status == "active":
+            if self.total > 0:
+                pct = int(100 * self.progress / self.total)
+                self.progress_bar.set_completion(self.progress)
+                self.text.set_text(f"⬇ Downloading... {pct}%")
+            else:
+                self.text.set_text("⬇ Downloading...")
+        elif self.status == "completed":
+            self.progress_bar.set_completion(self.total or 100)
+            self.text.set_text(('success', "✓ Completed"))
+        elif self.status == "failed":
+            self.text.set_text(('error', "✗ Failed"))
+        elif self.status == "verifying":
+            self.text.set_text(('warning', "⚙ Verifying hash..."))
+        elif self.status == "verified":
+            self.text.set_text(('success', "✓ Verified"))
+        elif self.status == "verify_failed":
+            self.text.set_text(('error', "✗ Hash verification failed"))
+        else:
+            self.text.set_text("⋯ Queued")
+    
+    def update_progress(self, progress, total, status="active"):
+        """Update progress values."""
+        self.progress = progress
+        self.total = total
+        self.status = status
+        self.update_display()
+
+
+class DistroGetUI:
+    """Main urwid UI for distroget."""
+    
+    palette = [
+        ('header', 'white,bold', 'dark blue'),
+        ('footer', 'white', 'dark blue'),
+        ('selected', 'black', 'light gray'),
+        ('focus', 'black', 'yellow'),
+        ('checked', 'light green,bold', 'default'),
+        ('filename', 'light cyan', 'default'),
+        ('success', 'light green', 'default'),
+        ('error', 'light red', 'default'),
+        ('warning', 'yellow', 'default'),
+        ('pg_normal', 'white', 'dark blue'),
+        ('pg_complete', 'white', 'light green'),
+        ('auto_deploy', 'light magenta', 'default'),
+    ]
+    
+    def __init__(self, distro_dict):
+        self.distro_dict = distro_dict
+        self.config_mgr = ConfigManager()
+        self.selected_items = set()
+        self.downloaded_items = set()
+        self.auto_deploy_items = set(self.config_mgr.get_auto_deploy_items())
+        self.target_directory = None
+        self.download_manager = None
+        self.path_stack = []
+        self.current_menu = sorted(distro_dict.keys(), key=str.lower)
+        self.search_mode = False
+        self.search_results = []
+        self.expanded_items = set()  # Track which items are expanded
+        self.terminal_width = 80  # Default, will be updated
+        self.left_panel_width = 48  # 60% of 80
+        self.terminal_width = 80  # Default, will be updated
+        self.left_panel_width = 48  # 60% of 80
+        
+        # Create UI components
+        self.create_menu()
+        self.create_download_panel()
+        self.create_layout()
+        
+        # Setup main loop
+        self.loop = urwid.MainLoop(
+            self.main_frame,
+            palette=self.palette,
+            unhandled_input=self.handle_input
+        )
+        
+        # Schedule periodic updates for downloads
+        self.update_alarm = None
+        self.schedule_update()
+    
+    def create_menu(self):
+        """Create the left menu panel."""
+        self.menu_items = []
+        self.menu_walker = urwid.SimpleFocusListWalker(self.menu_items)
+        self.menu_listbox = urwid.ListBox(self.menu_walker)
+        
+        self.update_menu()
+        
+        # Wrap in a line box
+        self.menu_box = urwid.LineBox(
+            self.menu_listbox,
+            title="ISO Selection"
+        )
+    
+    def create_download_panel(self):
+        """Create the right download status panel."""
+        self.download_widgets = {}
+        self.download_walker = urwid.SimpleFocusListWalker([
+            urwid.Text("No downloads active")
+        ])
+        self.download_listbox = urwid.ListBox(self.download_walker)
+        
+        self.download_box = urwid.LineBox(
+            self.download_listbox,
+            title="Downloads"
+        )
+    
+    def create_layout(self):
+        """Create the main layout."""
+        # Get terminal size
+        try:
+            import shutil
+            term_size = shutil.get_terminal_size()
+            self.terminal_width = term_size.columns
+        except:
+            self.terminal_width = 80
+        
+        # Calculate left panel width (60% of screen minus borders and padding)
+        self.left_panel_width = int(self.terminal_width * 0.6) - 6  # Account for borders, checkbox, padding
+        
+        # Header
+        path_text = f"Path: {'/'.join(self.path_stack) if self.path_stack else 'root'}"
+        selected_text = f"Selected: {len(self.selected_items)}"
+        dest_text = f"Dest: {self.target_directory or 'Not set'}"
+        
+        self.header = urwid.AttrMap(
+            urwid.Text(f"{path_text} | {selected_text} | {dest_text}"),
+            'header'
+        )
+        
+        # Footer
+        help_text = "↑↓:Navigate ←→:Collapse/Expand Enter:Toggle SPACE:Select C:ClearAll /:Search D:Dir Q:Quit"
+        self.footer = urwid.AttrMap(urwid.Text(help_text), 'footer')
+        
+        # Main columns (60/40 split)
+        self.columns = urwid.Columns([
+            ('weight', 60, self.menu_box),
+            ('weight', 40, self.download_box)
+        ])
+        
+        # Wrap columns in a custom widget that intercepts arrow keys
+        self.main_widget = urwid.WidgetWrap(self.columns)
+        
+        # Main frame
+        self.main_frame = urwid.Frame(
+            self.main_widget,
+            header=self.header,
+            footer=self.footer
+        )
+        
+        # Override keypress to intercept navigation keys
+        original_keypress = self.main_frame.keypress
+        
+        def custom_keypress(size, key):
+            # Intercept arrow keys before they reach the widgets
+            if key in ('right', 'l', 'left', 'h', 'esc'):
+                # Let our handler process it
+                result = self.handle_input(key)
+                if result:
+                    return None  # Key was handled
+            # Let the frame handle other keys
+            return original_keypress(size, key)
+        
+        self.main_frame.keypress = custom_keypress
+    
+    def update_menu(self):
+        """Update menu items with tree-view style (indented children)."""
+        self.menu_walker.clear()
+        
+        def add_items_recursively(items, path_prefix, indent_level=0):
+            """Recursively add items with proper indentation."""
+            if isinstance(items, dict):
+                # Sort keys for consistent ordering
+                sorted_keys = sorted(items.keys(), key=str.lower)
+                for item in sorted_keys:
+                    if item == "_items":  # Skip special items key
+                        continue
+                    
+                    item_path = "/".join(path_prefix + [item])
+                    child_node = items[item]
+                    
+                    # Check if this is a leaf or has children
+                    has_children = isinstance(child_node, dict) or isinstance(child_node, list)
+                    is_selected = item_path in self.selected_items
+                    is_auto = item_path in self.auto_deploy_items
+                    is_expanded = item_path in self.expanded_items
+                    
+                    # Check for partial selection (some but not all children selected)
+                    partial_selection = False
+                    if has_children and not is_selected:
+                        # Count selected children
+                        selected_children = [s for s in self.selected_items if s.startswith(item_path + "/")]
+                        if selected_children:
+                            partial_selection = True
+                    
+                    # Create indent and markers
+                    indent_str = "  " * indent_level
+                    folder_marker = "▼ " if (has_children and is_expanded) else ("▶ " if has_children else "  ")
+                    auto_marker = "[a]" if is_auto else "   "
+                    
+                    # Clip long labels to prevent wrapping based on actual panel width
+                    full_label = f"{indent_str}{auto_marker} {folder_marker}{item}"
+                    max_width = max(self.left_panel_width - 4, 30)  # Ensure minimum width
+                    label = full_label[:max_width] if len(full_label) > max_width else full_label
+                    
+                    # Create checkbox with proper state (including partial)
+                    if partial_selection:
+                        # Use special state for partial selection
+                        checkbox = urwid.CheckBox(label, state=False, has_mixed=True)
+                        # Store our custom attributes
+                        checkbox.path = item_path
+                        checkbox.has_children = has_children
+                        checkbox.is_auto_deploy = False
+                        checkbox.item_name = item
+                        checkbox.indent = indent_level
+                        # Override the display to show [o]
+                        checkbox._label.set_text(label.replace("[ ]", "[o]"))
+                    else:
+                        checkbox = DistroCheckBox(
+                            label,
+                            state=is_selected,
+                            path=item_path,
+                            has_children=has_children,
+                            item_name=item,
+                            indent=indent_level
+                        )
+                        checkbox.set_auto_deploy(is_auto)
+                    
+                    # Connect signal for checkbox changes
+                    urwid.connect_signal(checkbox, 'change', 
+                                        lambda cb, state, path=item_path: self.on_checkbox_changed(cb, state, path))
+                    
+                    self.menu_walker.append(checkbox)
+                    
+                    # If expanded, show children
+                    if is_expanded and has_children:
+                        if isinstance(child_node, dict):
+                            # Recursively show nested folders and their contents
+                            add_items_recursively(child_node, path_prefix + [item], indent_level + 1)
+                        elif isinstance(child_node, list):
+                            # List of URLs - show them indented
+                            for url_item in child_node:
+                                url_path = item_path + "/" + url_item
+                                is_url_selected = url_path in self.selected_items
+                                
+                                indent_str = "  " * (indent_level + 1)
+                                full_url_label = f"{indent_str}    {url_item}"
+                                max_width = max(self.left_panel_width - 4, 30)
+                                url_label = full_url_label[:max_width] if len(full_url_label) > max_width else full_url_label
+                                
+                                url_checkbox = DistroCheckBox(
+                                    url_label,
+                                    state=is_url_selected,
+                                    path=url_path,
+                                    has_children=False,
+                                    item_name=url_item,
+                                    indent=indent_level + 1
+                                )
+                                
+                                urwid.connect_signal(url_checkbox, 'change',
+                                                    lambda cb, state, path=url_path: self.on_checkbox_changed(cb, state, path))
+                                
+                                self.menu_walker.append(url_checkbox)
+            elif isinstance(items, list):
+                # Direct list of URLs
+                for url_item in items:
+                    url_path = "/".join(path_prefix + [url_item])
+                    is_url_selected = url_path in self.selected_items
+                    
+                    indent_str = "  " * indent_level
+                    full_url_label = f"{indent_str}    {url_item}"
+                    max_width = max(self.left_panel_width - 4, 30)
+                    url_label = full_url_label[:max_width] if len(full_url_label) > max_width else full_url_label
+                    
+                    url_checkbox = DistroCheckBox(
+                        url_label,
+                        state=is_url_selected,
+                        path=url_path,
+                        has_children=False,
+                        item_name=url_item,
+                        indent=indent_level
+                    )
+                    
+                    urwid.connect_signal(url_checkbox, 'change',
+                                        lambda cb, state, path=url_path: self.on_checkbox_changed(cb, state, path))
+                    
+                    self.menu_walker.append(url_checkbox)
+        
+        # Start building from root
+        add_items_recursively(self.distro_dict, [])
+    
+    def on_checkbox_changed(self, checkbox, new_state, item_path):
+        """Handle checkbox state changes."""
+        if new_state:
+            self.selected_items.add(item_path)
+            
+            # Queue for download if manager is active
+            if self.download_manager:
+                urls = extract_urls_for_path(self.distro_dict, item_path)
+                for url in urls:
+                    if url not in self.downloaded_items:
+                        self.download_manager.add_download(url)
+                        self.downloaded_items.add(url)
+        else:
+            self.selected_items.discard(item_path)
+        self.update_header()
+    
+    def update_header(self):
+        """Update the header with current info."""
+        # Count leaf selections only
+        iso_count = sum(1 for path in self.selected_items 
+                       if '/' in path and not any(other.startswith(path + '/') 
+                                                  for other in self.selected_items))
+        selected_text = f"Selected: {iso_count}"
+        dest_text = f"Dest: {self.target_directory or 'Not set'}"
+        expanded_count = len(self.expanded_items)
+        expand_text = f"Expanded: {expanded_count}" if expanded_count > 0 else "Tree View"
+        
+        self.header.original_widget.set_text(f"{expand_text} | {selected_text} | {dest_text}")
+    
+    def update_download_panel(self):
+        """Update download status display."""
+        if not self.download_manager:
+            return
+        
+        status = self.download_manager.get_status()
+        
+        # Clear and rebuild
+        self.download_walker.clear()
+        
+        # Summary line
+        summary = f"Total: {status['completed'] + status['failed'] + status['queued']} | "
+        summary += f"Done: {status['completed']} | Failed: {status['failed']}"
+        if status['queued'] > 0:
+            summary += f" | Queued: {status['queued']}"
+        
+        self.download_walker.append(urwid.Text(('header', summary)))
+        self.download_walker.append(urwid.Divider())
+        
+        # Active downloads
+        if status['active']:
+            self.download_walker.append(urwid.Text(('warning', "Active Downloads:")))
+            for url, info in status['active'].items():
+                if url not in self.download_widgets:
+                    self.download_widgets[url] = DownloadStatusWidget(
+                        info['filename'],
+                        info.get('total', 0)
+                    )
+                
+                widget = self.download_widgets[url]
+                widget.update_progress(
+                    info.get('progress', 0),
+                    info.get('total', 0),
+                    'active'
+                )
+                self.download_walker.append(widget)
+            
+            self.download_walker.append(urwid.Divider())
+        
+        # Completed files
+        if status['downloaded_files']:
+            self.download_walker.append(urwid.Text(('success', "Downloaded Files:")))
+            
+            for filepath in status['downloaded_files'][:10]:  # Limit display
+                filename = os.path.basename(filepath)
+                
+                # Check hash verification status
+                verification = status.get('hash_verification', {}).get(filepath, (None, ''))
+                
+                if verification[0] is True:
+                    icon = ('success', "✓")
+                elif verification[0] is False:
+                    icon = ('error', "✗")
+                else:
+                    icon = ('warning', "•")
+                
+                self.download_walker.append(
+                    urwid.Text([icon, " ", filename])
+                )
+        
+        if not status['active'] and not status['downloaded_files']:
+            self.download_walker.append(urwid.Text("Set target dir (D) to begin"))
+    
+    def schedule_update(self):
+        """Schedule next update."""
+        if self.update_alarm:
+            self.loop.remove_alarm(self.update_alarm)
+        
+        self.update_alarm = self.loop.set_alarm_in(0.5, self.periodic_update)
+    
+    def periodic_update(self, loop, user_data):
+        """Periodically update download status."""
+        if self.download_manager:
+            self.update_download_panel()
+            self.loop.draw_screen()
+        
+        self.schedule_update()
+    
+    def handle_input(self, key):
+        """Handle keyboard input."""
+        if key in ('q', 'Q'):
+            self.cleanup()
+            raise urwid.ExitMainLoop()
+        
+        elif key == 'enter':
+            # Toggle expand/collapse for selected item
+            focus_widget = self.menu_listbox.focus
+            if focus_widget and hasattr(focus_widget, 'item_name'):
+                self.toggle_expand(focus_widget)
+            return True
+        
+        elif key in ('right', 'l'):
+            # Expand container
+            focus_widget = self.menu_listbox.focus
+            if focus_widget and hasattr(focus_widget, 'has_children') and focus_widget.has_children:
+                if focus_widget.path not in self.expanded_items:
+                    self.expanded_items.add(focus_widget.path)
+                    focused_path = focus_widget.path
+                    self.update_menu()
+                    self.update_header()
+                    # Restore focus to the expanded item
+                    for idx, widget in enumerate(self.menu_walker):
+                        if hasattr(widget, 'path') and widget.path == focused_path:
+                            self.menu_walker.set_focus(idx)
+                            break
+            return True
+        
+        elif key in ('left', 'esc', 'h'):
+            # Collapse container or go to parent
+            focus_widget = self.menu_listbox.focus
+            if focus_widget and hasattr(focus_widget, 'path'):
+                focused_path = focus_widget.path
+                # If this item is expanded, collapse it
+                if focus_widget.path in self.expanded_items:
+                    self.expanded_items.remove(focus_widget.path)
+                    self.update_menu()
+                    self.update_header()
+                    # Restore focus
+                    for idx, widget in enumerate(self.menu_walker):
+                        if hasattr(widget, 'path') and widget.path == focused_path:
+                            self.menu_walker.set_focus(idx)
+                            break
+                else:
+                    # Find and collapse parent
+                    path_parts = focus_widget.path.split('/')
+                    if len(path_parts) > 1:
+                        parent_path = '/'.join(path_parts[:-1])
+                        if parent_path in self.expanded_items:
+                            self.expanded_items.remove(parent_path)
+                            self.update_menu()
+                            self.update_header()
+                            # Try to focus on parent
+                            for idx, widget in enumerate(self.menu_walker):
+                                if hasattr(widget, 'path') and widget.path == parent_path:
+                                    self.menu_walker.set_focus(idx)
+                                    break
+            return True
+        
+        elif key in ('d', 'D'):
+            # Set download directory
+            self.show_directory_dialog()
+            return True
+        
+        elif key in ('a', 'A'):
+            # Toggle auto-deploy
+            focus_widget = self.menu_listbox.focus
+            if focus_widget and hasattr(focus_widget, 'path'):
+                self.toggle_auto_deploy(focus_widget.path)
+            return True
+        
+        elif key in ('v', 'V'):
+            # View failed verifications
+            if self.download_manager:
+                self.show_failed_verifications()
+            return True
+        
+        elif key in ('c', 'C'):
+            # Clear all selections and cancel downloads
+            self.show_clear_all_dialog()
+            return True
+        
+        elif key == '/':
+            # Start search (only at root level)
+            if not self.path_stack:
+                self.show_search_dialog()
+            return True
+    
+    def toggle_expand(self, widget):
+        """Toggle expansion of a tree item."""
+        if not hasattr(widget, 'has_children') or not widget.has_children:
+            return
+        
+        if widget.path in self.expanded_items:
+            self.expanded_items.remove(widget.path)
+        else:
+            self.expanded_items.add(widget.path)
+        
+        self.update_menu()
+        self.update_header()
+        
+        # Try to keep focus on the same item
+        for idx, w in enumerate(self.menu_walker):
+            if hasattr(w, 'path') and w.path == widget.path:
+                self.menu_walker.set_focus(idx)
+                break
+    
+    def navigate_to(self, item):
+        """Navigate to and expand an item (used by search)."""
+        # Find the item in the tree and expand it
+        for idx, widget in enumerate(self.menu_walker):
+            if hasattr(widget, 'item_name') and widget.item_name == item:
+                if hasattr(widget, 'has_children') and widget.has_children:
+                    if widget.path not in self.expanded_items:
+                        self.expanded_items.add(widget.path)
+                        self.update_menu()
+                        self.update_header()
+                        # Refocus after update
+                        for new_idx, w in enumerate(self.menu_walker):
+                            if hasattr(w, 'path') and w.path == widget.path:
+                                self.menu_walker.set_focus(new_idx)
+                                break
+                break
+    
+    def show_directory_dialog(self):
+        """Show dialog to set download directory with history."""
+        config = load_config()
+        history = config.get('location_history', [])
+        
+        # Build menu items
+        menu_items = []
+        buttons = []
+        
+        # Add "Enter new location" option
+        new_button = urwid.Button("< Enter new location >")
+        urwid.connect_signal(new_button, 'click', lambda btn: self.enter_new_directory())
+        buttons.append(urwid.AttrMap(new_button, None, focus_map='focus'))
+        
+        # Add history items
+        for location in history:
+            btn = urwid.Button(location)
+            urwid.connect_signal(btn, 'click', lambda btn, loc=location: self.set_directory(loc))
+            buttons.append(urwid.AttrMap(btn, None, focus_map='focus'))
+        
+        if not buttons:
+            buttons.append(urwid.Text("No history available"))
+        
+        # Create listbox
+        walker = urwid.SimpleFocusListWalker(buttons)
+        listbox = urwid.ListBox(walker)
+        
+        dialog = urwid.LineBox(
+            urwid.Pile([
+                urwid.Text("Select Download Location:"),
+                urwid.Divider(),
+                urwid.BoxAdapter(listbox, height=min(10, len(buttons) + 2)),
+                urwid.Divider(),
+                urwid.Text("Use ↑↓ to navigate, Enter to select, Esc to cancel")
+            ])
+        )
+        
+        overlay = urwid.Overlay(
+            dialog,
+            self.main_frame,
+            align='center',
+            width=70,
+            valign='middle',
+            height=min(20, len(buttons) + 8)
+        )
+        
+        original_input_handler = self.loop.unhandled_input
+        
+        def handle_dialog_input(key):
+            if key == 'esc':
+                self.loop.widget = self.main_frame
+                self.loop.unhandled_input = original_input_handler
+        
+        self.loop.widget = overlay
+        self.loop.unhandled_input = handle_dialog_input
+    
+    def enter_new_directory(self):
+        """Show text input dialog for entering new directory."""
+        edit = urwid.Edit("Download directory: ", self.target_directory or "")
+        
+        dialog = urwid.LineBox(
+            urwid.Pile([
+                urwid.Text("Enter download directory:"),
+                urwid.Text("(or hostname:/path for remote)"),
+                urwid.Divider(),
+                edit,
+                urwid.Divider(),
+                urwid.Text("Press Enter to confirm, Esc to cancel")
+            ])
+        )
+        
+        overlay = urwid.Overlay(
+            dialog,
+            self.main_frame,
+            align='center',
+            width=60,
+            valign='middle',
+            height=10
+        )
+        
+        original_input_handler = self.loop.unhandled_input
+        
+        def handle_dialog_input(key):
+            if key == 'enter':
+                new_dir = edit.get_edit_text()
+                if new_dir:
+                    self.set_directory(new_dir)
+                else:
+                    self.loop.widget = self.main_frame
+                    self.loop.unhandled_input = original_input_handler
+            elif key == 'esc':
+                self.loop.widget = self.main_frame
+                self.loop.unhandled_input = original_input_handler
+        
+        self.loop.widget = overlay
+        self.loop.unhandled_input = handle_dialog_input
+    
+    def set_directory(self, directory):
+        """Set the download directory and initialize manager."""
+        self.target_directory = directory
+        
+        # Add to history
+        add_to_location_history(directory)
+        
+        # Expand ~ and environment variables for local paths
+        if ':' not in self.target_directory:
+            self.target_directory = os.path.expandvars(os.path.expanduser(self.target_directory))
+            os.makedirs(self.target_directory, exist_ok=True)
+        
+        self.initialize_download_manager()
+        self.loop.widget = self.main_frame
+        self.loop.unhandled_input = self.handle_input
+        self.update_header()
+        self.update_download_panel()
+    
+    def initialize_download_manager(self):
+        """Initialize the download manager."""
+        if not self.download_manager:
+            self.download_manager = DownloadManager(self.target_directory)
+            self.download_manager.start()
+            
+            # Queue already-selected items
+            for item_path in self.selected_items:
+                urls = extract_urls_for_path(self.distro_dict, item_path)
+                for url in urls:
+                    if url not in self.downloaded_items:
+                        self.download_manager.add_download(url)
+                        self.downloaded_items.add(url)
+    
+    def toggle_auto_deploy(self, item_path):
+        """Toggle auto-deploy marker for an item."""
+        if item_path in self.auto_deploy_items:
+            self.auto_deploy_items.discard(item_path)
+            self.config_mgr.remove_auto_deploy_item(item_path)
+        else:
+            self.auto_deploy_items.add(item_path)
+            self.config_mgr.add_auto_deploy_item(item_path)
+        
+        self.update_menu()
+    
+    def show_search_dialog(self):
+        """Show search dialog for finding distros."""
+        edit = urwid.Edit("Search: ", "")
+        
+        # Create a list for displaying results
+        results_walker = urwid.SimpleFocusListWalker([
+            urwid.Text("Type to search distros...")
+        ])
+        results_listbox = urwid.ListBox(results_walker)
+        
+        search_results = []
+        
+        def update_search(edit_widget, new_text):
+            """Update search results as user types."""
+            query = new_text.lower()
+            if not query:
+                results_walker[:] = [urwid.Text("Type to search distros...")]
+                search_results.clear()
+                return
+            
+            # Search through all top-level distros
+            matches = []
+            for distro_name in sorted(self.distro_dict.keys(), key=str.lower):
+                if query in distro_name.lower():
+                    matches.append(distro_name)
+            
+            # Update results list
+            if matches:
+                search_results.clear()
+                search_results.extend(matches)
+                
+                # Build new results list
+                new_results = []
+                for match in matches[:20]:  # Limit to 20 results
+                    btn = urwid.Button(match)
+                    urwid.connect_signal(btn, 'click', lambda b, m=match: jump_to_match(m))
+                    new_results.append(urwid.AttrMap(btn, None, focus_map='focus'))
+                
+                if len(matches) > 20:
+                    new_results.append(urwid.Text(f"... and {len(matches) - 20} more"))
+                
+                results_walker[:] = new_results
+            else:
+                results_walker[:] = [urwid.Text(("error", "No matches found"))]
+                search_results.clear()
+        
+        # Connect the change event to update search
+        urwid.connect_signal(edit, 'change', update_search)
+        
+        def jump_to_match(match_name):
+            """Jump to a specific match in the main menu and open it."""
+            # Close dialog first
+            self.loop.widget = self.main_frame
+            self.loop.unhandled_input = original_input_handler
+            
+            # Find index in menu and move focus
+            try:
+                idx = self.current_menu.index(match_name)
+                # Set focus on the walker
+                self.menu_walker.set_focus(idx)
+                # Ensure left panel has focus
+                self.columns.focus_position = 0
+                # Force redraw
+                self.loop.draw_screen()
+                
+                # Auto-open the matched distro (navigate into it)
+                self.navigate_to(match_name)
+            except (ValueError, IndexError):
+                pass
+        
+        pile_contents = [
+            urwid.Text("Search Distributions (at root level):"),
+            urwid.Divider(),
+            edit,
+            urwid.Divider(),
+            urwid.BoxAdapter(results_listbox, height=8),
+            urwid.Divider(),
+            urwid.Text("Type to search, ↑↓ to select, Enter to jump, Esc to cancel")
+        ]
+        
+        pile = urwid.Pile(pile_contents)
+        # Set initial focus to the edit widget
+        pile.focus_position = 2  # The edit widget is at index 2
+        
+        dialog = urwid.LineBox(pile)
+        
+        overlay = urwid.Overlay(
+            dialog,
+            self.main_frame,
+            align='center',
+            width=70,
+            valign='middle',
+            height=18
+        )
+        
+        original_input_handler = self.loop.unhandled_input
+        
+        def handle_dialog_input(key):
+            # Ignore mouse events
+            if isinstance(key, tuple):
+                return
+            
+            if key == 'enter':
+                # Jump to first/selected search result
+                if search_results:
+                    # Check if we're in the results list
+                    if pile.focus_position == 4:  # results_listbox position
+                        # Get focused item from results listbox
+                        focus_widget = results_listbox.focus
+                        if focus_widget and hasattr(focus_widget, 'original_widget'):
+                            # It's an AttrMap wrapping a Button
+                            button = focus_widget.original_widget
+                            if hasattr(button, 'get_label'):
+                                match_name = button.get_label()
+                                jump_to_match(match_name)
+                                return
+                    
+                    # Fallback to first result
+                    jump_to_match(search_results[0])
+                else:
+                    # No results, just close
+                    self.loop.widget = self.main_frame
+                    self.loop.unhandled_input = original_input_handler
+            elif key == 'esc':
+                self.loop.widget = self.main_frame
+                self.loop.unhandled_input = original_input_handler
+            elif key == 'tab':
+                # Switch focus between edit and results
+                if pile.focus_position == 2:  # edit
+                    pile.focus_position = 4  # results
+                else:
+                    pile.focus_position = 2  # edit
+            elif key in ('up', 'down') and pile.focus_position == 2:
+                # If we're in edit and press up/down, move to results
+                if search_results:
+                    pile.focus_position = 4
+        
+        self.loop.widget = overlay
+        self.loop.unhandled_input = handle_dialog_input
+    
+    def show_clear_all_dialog(self):
+        """Show confirmation dialog to clear all selections and cancel downloads."""
+        selection_count = len(self.selected_items)
+        download_count = len(self.downloaded_items) if self.download_manager else 0
+        
+        # Build dialog content
+        content = [
+            urwid.Text(('error', "Clear All Selections?")),
+            urwid.Divider(),
+        ]
+        
+        if selection_count > 0:
+            content.append(urwid.Text(f"Selected items: {selection_count}"))
+        
+        if download_count > 0:
+            content.append(urwid.Text(f"Queued/Active downloads: {download_count}"))
+            content.append(urwid.Divider())
+            content.append(urwid.Text(('warning', "This will cancel all active downloads!")))
+        
+        content.extend([
+            urwid.Divider(),
+            urwid.Text("Press 'Y' to confirm, any other key to cancel")
+        ])
+        
+        dialog = urwid.LineBox(urwid.Pile(content))
+        
+        overlay = urwid.Overlay(
+            dialog,
+            self.main_frame,
+            align='center',
+            width=60,
+            valign='middle',
+            height=len(content) + 4
+        )
+        
+        original_input_handler = self.loop.unhandled_input
+        
+        def handle_dialog_input(key):
+            if key in ('y', 'Y'):
+                # Clear all selections
+                self.selected_items.clear()
+                self.downloaded_items.clear()
+                
+                # Stop and reset download manager
+                if self.download_manager:
+                    self.download_manager.stop()
+                    self.download_manager = None
+                    self.target_directory = None
+                
+                # Update display
+                self.update_menu()
+                self.update_header()
+                self.update_download_panel()
+                
+                self.loop.widget = self.main_frame
+                self.loop.unhandled_input = original_input_handler
+            else:
+                # Cancel - just close dialog
+                self.loop.widget = self.main_frame
+                self.loop.unhandled_input = original_input_handler
+        
+        self.loop.widget = overlay
+        self.loop.unhandled_input = handle_dialog_input
+    
+    def show_failed_verifications(self):
+        """Show dialog with failed hash verifications."""
+        failed = self.download_manager.get_failed_verifications()
+        
+        if not failed:
+            return
+        
+        # Build dialog content
+        content = [
+            urwid.Text(('error', "Hash Verification Failed")),
+            urwid.Divider(),
+            urwid.Text("The following files failed verification:"),
+            urwid.Divider(),
+        ]
+        
+        for filepath, message in failed:
+            filename = os.path.basename(filepath)
+            content.append(urwid.Text([('error', "✗ "), filename]))
+        
+        content.extend([
+            urwid.Divider(),
+            urwid.Text("Press 'd' to delete all failed files"),
+            urwid.Text("Press 'k' to keep files"),
+        ])
+        
+        dialog = urwid.LineBox(urwid.Pile(content))
+        
+        overlay = urwid.Overlay(
+            dialog,
+            self.main_frame,
+            align='center',
+            width=('relative', 80),
+            valign='middle',
+            height=('relative', 60)
+        )
+        
+        original_input_handler = self.loop.unhandled_input
+        
+        def handle_dialog_input(key):
+            if key in ('d', 'D'):
+                deleted = self.download_manager.delete_failed_verifications()
+                self.loop.widget = self.main_frame
+                self.loop.unhandled_input = original_input_handler
+                self.update_download_panel()
+            elif key in ('k', 'K', 'esc'):
+                self.loop.widget = self.main_frame
+                self.loop.unhandled_input = original_input_handler
+        
+        self.loop.widget = overlay
+        self.loop.unhandled_input = handle_dialog_input
+    
+    def cleanup(self):
+        """Cleanup before exit."""
+        if self.download_manager:
+            # Wait for downloads to complete and show summary
+            status = self.download_manager.get_status()
+            if status['active'] or status['queued'] > 0:
+                # Downloads still in progress
+                self.download_manager.download_queue.join()
+            
+            self.download_manager.stop()
+    
+    def run(self):
+        """Run the UI."""
+        try:
+            self.loop.run()
+        finally:
+            # Show summary after UI exits
+            if self.download_manager:
+                status = self.download_manager.get_status()
+                print("\n" + "=" * 80)
+                print("Download Summary")
+                print("=" * 80)
+                
+                if status['completed'] > 0:
+                    print(f"✓ Successfully downloaded {status['completed']} file(s)")
+                if status['failed'] > 0:
+                    print(f"✗ Failed: {status['failed']} file(s)")
+                
+                # Check for hash verification failures
+                failed_verifications = self.download_manager.get_failed_verifications()
+                if failed_verifications:
+                    print(f"\n⚠ {len(failed_verifications)} file(s) failed hash verification")
+                
+                print("=" * 80)
+
+
+def run_urwid_ui(distro_dict):
+    """Run the urwid-based UI."""
+    ui = DistroGetUI(distro_dict)
+    ui.run()
+
+# ============================================================================
+# Legacy Curses Menu (kept for reference, can be removed later)
+# ============================================================================
 
 # Curses menu
 def curses_menu(stdscr, distro_dict):
@@ -1527,6 +2544,14 @@ def curses_menu(stdscr, distro_dict):
                     print("\n⚠ Files kept (you may want to re-download them)")
                 
                 print("=" * 80)
+            
+            # Show detailed download log
+            print("\n" + download_manager.get_download_log())
+            
+            # Save log to file
+            log_file = download_manager.save_download_log()
+            if log_file:
+                print(f"\n📄 Download log saved to: {log_file}\n")
     
     return final_urls, target_directory
 
@@ -1659,13 +2684,10 @@ def main():
     config = load_config()
     print("Fetching distros...")
     distro_dict = fetch_iso_list()
-    selected_urls, target_dir = curses.wrapper(curses_menu, distro_dict)
-    if not selected_urls:
-        print("No ISOs selected, exiting.")
-        sys.exit(0)
     
-    # Downloads already happened in background - summary was already shown
-    # Just exit gracefully
+    # Use urwid UI instead of curses
+    run_urwid_ui(distro_dict)
+    
     sys.exit(0)
 
 def update_only_mode():
