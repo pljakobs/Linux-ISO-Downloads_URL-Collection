@@ -215,10 +215,12 @@ class TestHashVerifier:
     def test_hash_patterns_coverage(self):
         """Test that we have hash patterns for major distros."""
         patterns = HashVerifier.HASH_PATTERNS
-        
+
         # Check major distributions are covered
-        expected_distros = ['ubuntu', 'debian', 'fedora', 'arch', 'rocky']
-        
+        # Note: 'archlinux' is used instead of 'arch' to avoid substring collision
+        # with 'archive.kali.org' etc.
+        expected_distros = ['ubuntu', 'debian', 'fedora', 'archlinux', 'rocky']
+
         for distro in expected_distros:
             assert distro in patterns or distro.replace(' ', '') in patterns, \
                 f"Missing hash pattern for {distro}"
