@@ -263,3 +263,156 @@ class TestUIStatusCompatibility:
             list(status['active'].items())
         except AttributeError:
             pytest.fail("status['active'] does not support .items()")
+
+
+class TestREADMEUpdates:
+    """Integration tests for README.md updates via updaters."""
+    
+    def test_devuan_updater_modifies_readme(self):
+        """Test that DevuanUpdater can properly update README.md."""
+        from pathlib import Path
+        from updaters import DevuanUpdater, DistroUpdater
+        from unittest.mock import patch, MagicMock
+        
+        # Create test README content
+        original_content = """# Linux ISO Downloads
+
+## Devuan
+- Old link 1
+- Old link 2
+
+## Ubuntu  
+- Ubuntu link
+"""
+        
+        # Mock the mirror fetch to return consistent data
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '''
+            <a href="devuan_excalibur_6.1.0_amd64_desktop.iso">desktop</a>
+            <a href="devuan_excalibur_6.1.0_amd64_netinstall.iso">netinstall</a>
+        '''
+        
+        with patch('requests.get', return_value=mock_response):
+            # Get version
+            version = DevuanUpdater.get_latest_version()
+            assert version is not None, "Should detect version from mocked mirror"
+            
+            # Generate links
+            links = DevuanUpdater.generate_download_links(version)
+            assert len(links) > 0, "Should generate download links"
+            
+            # Update README content
+            updated = DevuanUpdater.update_section(original_content, version, links)
+            
+            # Verify changes
+            assert updated != original_content, "Content should be modified"
+            assert "Devuan" in updated, "Should preserve Devuan section"
+            assert "Ubuntu" in updated, "Should preserve other sections"
+            assert "Old link 1" not in updated, "Old links should be replaced"
+            assert version in updated or "6.1.0" in updated, "Should contain new version"
+    
+    def test_update_section_replaces_old_content(self):
+        """Test that update_section properly replaces old distro content."""
+        from updaters import DistroUpdater
+        
+        original_content = """# ISOs
+
+## Test Distro
+- [Old ISO 1.0](http://old.example.com/iso1.iso)
+- [Old ISO 1.0](http://old.example.com/iso2.iso)
+
+## Other Distro
+- [Other](http://other.com/iso.iso)
+"""
+        
+        new_links = [
+            "- [New ISO 2.0](http://new.example.com/iso1.iso)",
+            "- [New ISO 2.0](http://new.example.com/iso2.iso)"
+        ]
+        
+        # Use simple_update_section to test basic replacement
+        updated = DistroUpdater.simple_update_section(original_content, "Test Distro", new_links)
+        
+        # Verify old content is replaced
+        assert "Old ISO 1.0" not in updated, "Old version links should be removed"
+        assert "New ISO 2.0" in updated, "New version links should be present"
+        assert "Test Distro" in updated, "Section title should remain"
+        assert "Other Distro" in updated, "Other sections should remain unchanged"
+    
+    def test_metadata_comment_added_to_updates(self):
+        """Test that metadata comments are added to updated sections."""
+        from updaters import DistroUpdater
+        
+        section = "## Test ISO\n- [Link](http://example.com/test.iso)\n"
+        metadata = {
+            'auto_updated': True,
+            'last_updated': '2026-04-17 12:00 UTC'
+        }
+        
+        # Add metadata comment
+        result = DistroUpdater.add_metadata_comment(section, metadata)
+        
+        assert "<!-- Auto-updated: 2026-04-17 12:00 UTC -->" in result
+        assert "## Test ISO" in result
+        assert "[Link]" in result
+    
+    def test_multiple_distro_updates_preserve_structure(self):
+        """Test that updating multiple distros preserves README structure."""
+        from updaters import DistroUpdater
+        
+        original_content = """# Linux ISO Collection
+
+## Header
+General info
+
+## Distro 1
+- Old link 1
+
+## Distro 2  
+- Old link 2
+
+## Footer
+End info
+"""
+        
+        # Simulate updating Distro 1
+        new_links_1 = ["- [New 1.0](http://example.com/distro1.iso)"]
+        updated = DistroUpdater.simple_update_section(original_content, "Distro 1", new_links_1)
+        
+        # Verify structure is maintained
+        assert "# Linux ISO Collection" in updated, "Main header should be preserved"
+        assert "## Header" in updated, "Other headers should be preserved"
+        assert "## Distro 2" in updated, "Other distros should be preserved"
+        assert "## Footer" in updated, "Footer should be preserved"
+        assert "General info" in updated, "General content should be preserved"
+        assert "End info" in updated, "End content should be preserved"
+        assert "New 1.0" in updated, "New content should be added"
+        assert "Old link 1" not in updated, "Old Distro 1 links should be gone"
+        assert "Old link 2" in updated, "Distro 2 links should remain unchanged"
+    
+    def test_readme_backup_creation(self):
+        """Test that README can be backed up before update."""
+        import tempfile
+        import shutil
+        from pathlib import Path
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create test README
+            readme_path = Path(tmpdir) / "README.md"
+            readme_path.write_text("# Test\nContent")
+            
+            # Create backup
+            backup_path = Path(tmpdir) / "README.md.backup"
+            shutil.copy2(readme_path, backup_path)
+            
+            # Verify backup exists and matches
+            assert backup_path.exists()
+            assert readme_path.read_text() == backup_path.read_text()
+            
+            # Modify original
+            readme_path.write_text("# Modified\nNew content")
+            
+            # Verify backup is unchanged
+            assert backup_path.read_text() == "# Test\nContent"
+            assert readme_path.read_text() != backup_path.read_text()
