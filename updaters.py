@@ -1603,6 +1603,361 @@ class ProxmoxVEUpdater(DistroUpdater):
         return DistroUpdater.simple_update_section(content, 'Proxmox VE', links, metadata)
 
 
+class TailsUpdater(DistroUpdater):
+    """Updater for Tails (The Amnesic Incognito Live System)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Tails version."""
+        try:
+            r = requests.get('https://tails.boum.org/news/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "Tails 6.5"
+            match = re.search(r'Tails[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Tails version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Tails download links."""
+        if not version:
+            return []
+        
+        url = f"https://iso-history.tails.boum.org/tails-amd64-{version}/tails-amd64-{version}.iso"
+        return [f"- [Tails {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Tails section."""
+        return DistroUpdater.simple_update_section(content, 'Tails', links, metadata)
+
+
+class ParrotOSUpdater(DistroUpdater):
+    """Updater for Parrot OS (security-focused)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Parrot OS version."""
+        try:
+            r = requests.get('https://www.parrotproject.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "6.1", "6.2"
+            match = re.search(r'Parrot[- ](?:Security[- ])?(\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Parrot OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Parrot OS download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('Home', 'home'),
+            ('Security', 'security'),
+            ('HTB', 'htb')
+        ]
+        
+        links = []
+        base_url = f"https://mirror.0x.sg/parrot/iso/testing"
+        
+        for name, edition in editions:
+            url = f"{base_url}/Parrot-{edition}-{version}_amd64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Parrot OS section."""
+        return DistroUpdater.simple_update_section(content, 'Parrot OS', links, metadata)
+
+
+class BackBoxUpdater(DistroUpdater):
+    """Updater for BackBox (penetration testing)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest BackBox version."""
+        try:
+            r = requests.get('https://www.backbox.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "8.1", "8.2"
+            match = re.search(r'BackBox[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching BackBox version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate BackBox download links."""
+        if not version:
+            return []
+        
+        url = f"https://backbox.mirror.garr.it/backbox-{version}-desktop-amd64.iso"
+        return [f"- [BackBox {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update BackBox section."""
+        return DistroUpdater.simple_update_section(content, 'BackBox', links, metadata)
+
+
+class BodhiLinuxUpdater(DistroUpdater):
+    """Updater for Bodhi Linux (lightweight)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Bodhi Linux version."""
+        try:
+            r = requests.get('https://www.bodhilinux.com/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "6.0", "7.0"
+            match = re.search(r'Bodhi[- ]Linux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Bodhi Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Bodhi Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/bodhilinux/files/bodhi-{version}-64.iso"
+        return [f"- [Bodhi Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Bodhi Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Bodhi Linux', links, metadata)
+
+
+class RescuezillaUpdater(DistroUpdater):
+    """Updater for Rescuezilla (backup and recovery)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Rescuezilla version from GitHub."""
+        try:
+            r = requests.get('https://api.github.com/repos/rescuezilla/rescuezilla/releases/latest', timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            
+            if 'tag_name' in data:
+                return data['tag_name'].lstrip('v')
+        except Exception as e:
+            print(f"    Error fetching Rescuezilla version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Rescuezilla download links."""
+        if not version:
+            return []
+        
+        url = f"https://github.com/rescuezilla/rescuezilla/releases/download/{version}/rescuezilla-{version}-64bit.noble.iso"
+        return [f"- [Rescuezilla {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Rescuezilla section."""
+        return DistroUpdater.simple_update_section(content, 'Rescuezilla', links, metadata)
+
+
+class GPartedLiveUpdater(DistroUpdater):
+    """Updater for GParted Live (partition tool)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest GParted Live version."""
+        try:
+            r = requests.get('https://sourceforge.net/projects/gparted/rss?path=/gparted-live/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "1.6.0-3"
+            match = re.search(r'gparted-live-(\d+\.\d+\.\d+-\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching GParted Live version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate GParted Live download links."""
+        if not version:
+            return []
+        
+        url = f"https://downloads.sourceforge.net/gparted/gparted-live-{version}-amd64.iso"
+        return [f"- [GParted Live {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update GParted Live section."""
+        return DistroUpdater.simple_update_section(content, 'GParted Live', links, metadata)
+
+
+class NetbootXyzUpdater(DistroUpdater):
+    """Updater for netboot.xyz (network boot loader)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest netboot.xyz version."""
+        try:
+            r = requests.get('https://boot.netboot.xyz/', timeout=10)
+            r.raise_for_status()
+            
+            # netboot.xyz doesn't have traditional versions, return "latest"
+            return "latest"
+        except Exception as e:
+            print(f"    Error checking netboot.xyz: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate netboot.xyz download links."""
+        if not version:
+            return []
+        
+        links = [
+            "- [ISO](https://boot.netboot.xyz/ipxe/netboot.xyz.iso)",
+            "- [Multiarch ISO](https://boot.netboot.xyz/ipxe/netboot.xyz-multiarch.iso)",
+            "- [IMG](https://boot.netboot.xyz/ipxe/netboot.xyz.img)",
+            "- [Multiarch IMG](https://boot.netboot.xyz/ipxe/netboot.xyz-multiarch.img)"
+        ]
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update netboot.xyz section."""
+        return DistroUpdater.simple_update_section(content, 'netboot.xyz', links, metadata)
+
+
+class VoidLinuxUpdater(DistroUpdater):
+    """Updater for Void Linux (independent distro)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Void Linux version."""
+        try:
+            r = requests.get('https://alpha.de.repo.voidlinux.org/live/current/', timeout=10)
+            r.raise_for_status()
+            
+            # Find ISO date like "20210930"
+            match = re.search(r'void-live-x86_64-(\d{8})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Void Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Void Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://alpha.de.repo.voidlinux.org/live/current/void-live-x86_64-{version}.iso"
+        return [f"- [Void Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Void Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Void Linux', links, metadata)
+
+
+class ClearLinuxUpdater(DistroUpdater):
+    """Updater for Clear Linux (minimal, performance-focused)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Clear Linux version."""
+        try:
+            r = requests.get('https://clearlinux.org/downloads', timeout=10)
+            r.raise_for_status()
+            
+            # Find version number
+            match = re.search(r'(\d{5})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Clear Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Clear Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://cdn.download.clearlinux.org/releases/{version}/clear/clear-{version}-live-server.iso"
+        return [f"- [Clear Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Clear Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Clear Linux', links, metadata)
+
+
+class OPNsenseUpdater(DistroUpdater):
+    """Updater for OPNsense (firewall/router)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest OPNsense version."""
+        try:
+            r = requests.get('https://mirror.opnsense.org/releases/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version directories like "23.7", "24.1"
+            versions = re.findall(r'href="(\d+\.\d+)/"', r.text)
+            if versions:
+                return sorted(versions, key=lambda x: tuple(map(int, x.split('.'))))[-1]
+        except Exception as e:
+            print(f"    Error fetching OPNsense version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate OPNsense download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirror.opnsense.org/releases/{version}/OPNsense-{version}-OpenSSL-dvd-amd64.iso.bz2"
+        return [f"- [OPNsense {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update OPNsense section."""
+        return DistroUpdater.simple_update_section(content, 'OPNsense', links, metadata)
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
@@ -1634,4 +1989,14 @@ DISTRO_UPDATERS = {
     'Qubes OS': QubesOSUpdater,
     'AlmaLinux': AlmaLinuxUpdater,
     'Proxmox VE': ProxmoxVEUpdater,
+    'Tails': TailsUpdater,
+    'Parrot OS': ParrotOSUpdater,
+    'BackBox': BackBoxUpdater,
+    'Bodhi Linux': BodhiLinuxUpdater,
+    'Rescuezilla': RescuezillaUpdater,
+    'GParted Live': GPartedLiveUpdater,
+    'netboot.xyz': NetbootXyzUpdater,
+    'Void Linux': VoidLinuxUpdater,
+    'Clear Linux': ClearLinuxUpdater,
+    'OPNsense': OPNsenseUpdater,
 }
