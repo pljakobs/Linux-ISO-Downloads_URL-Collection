@@ -181,6 +181,93 @@ class TestRockyCloudUpdater:
             assert len(links) > 0
 
 
+class TestDevuanUpdater:
+    """Test suite for DevuanUpdater."""
+    
+    @patch('requests.get')
+    def test_get_latest_version(self, mock_get):
+        """Test getting latest Devuan version."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '''
+            <html>
+            <body>
+            <a href="devuan_excalibur_6.1.0_amd64_desktop.iso">desktop</a>
+            <a href="devuan_excalibur_6.1.0_amd64_netinstall.iso">netinstall</a>
+            <a href="devuan_excalibur_6.0.0_amd64_server.iso">server</a>
+            </body>
+            </html>
+        '''
+        mock_get.return_value = mock_response
+        
+        if hasattr(updaters, 'DevuanUpdater'):
+            version = updaters.DevuanUpdater.get_latest_version()
+            assert version == "6.1.0"
+    
+    @patch('requests.get')
+    def test_get_latest_version_empty(self, mock_get):
+        """Test handling when no ISOs are found."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '<html><body>No ISOs</body></html>'
+        mock_get.return_value = mock_response
+        
+        if hasattr(updaters, 'DevuanUpdater'):
+            version = updaters.DevuanUpdater.get_latest_version()
+            assert version is None
+    
+    @patch('requests.get')
+    def test_generate_download_links(self, mock_get):
+        """Test generating Devuan download links."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '''
+            <a href="devuan_excalibur_6.1.0_amd64_desktop.iso">desktop</a>
+            <a href="devuan_excalibur_6.1.0_amd64_netinstall.iso">netinstall</a>
+            <a href="devuan_excalibur_6.1.0_amd64_server.iso">server</a>
+        '''
+        mock_get.return_value = mock_response
+        
+        if hasattr(updaters, 'DevuanUpdater'):
+            links = updaters.DevuanUpdater.generate_download_links("6.1.0")
+            assert len(links) == 3
+            assert all("6.1.0" in link for link in links)
+            assert any("desktop" in link for link in links)
+            assert any("netinstall" in link for link in links)
+            assert any("server" in link for link in links)
+    
+    @patch('requests.get')
+    def test_generate_download_links_with_fallback(self, mock_get):
+        """Test fallback when no ISOs are found in HTML."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '<html><body>Error</body></html>'
+        mock_get.return_value = mock_response
+        
+        if hasattr(updaters, 'DevuanUpdater'):
+            links = updaters.DevuanUpdater.generate_download_links("6.1.0")
+            # Should return fallback links
+            assert len(links) > 0
+            assert all("6.1.0" in link for link in links)
+    
+    def test_update_section(self):
+        """Test updating Devuan section in README."""
+        if hasattr(updaters, 'DevuanUpdater'):
+            content = "## Devuan\n- [Old](http://old.link/devuan.iso)\n"
+            links = [
+                "- [devuan_excalibur_6.1.0_amd64_desktop.iso](https://mirror.leaseweb.com/devuan/6.1.0/desktop.iso)",
+                "- [devuan_excalibur_6.1.0_amd64_server.iso](https://mirror.leaseweb.com/devuan/6.1.0/server.iso)"
+            ]
+            
+            result = updaters.DevuanUpdater.update_section(content, "6.1.0", links)
+            
+            assert "6.1.0" in result
+            assert "Devuan" in result
+            assert "desktop.iso" in result
+            assert "server.iso" in result
+            assert "old.link" not in result  # Old content should be replaced
+
+
 class TestDistroUpdaters:
     """Test suite for DISTRO_UPDATERS dictionary."""
     

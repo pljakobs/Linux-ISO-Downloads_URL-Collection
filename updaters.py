@@ -1170,6 +1170,75 @@ class RockyCloudUpdater(DistroUpdater):
         return content
 
 
+class DevuanUpdater(DistroUpdater):
+    """Updater for Devuan (Debian fork without systemd)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Devuan version from mirror."""
+        try:
+            # Check the installer-iso directory for latest ISOs
+            r = requests.get('https://mirror.leaseweb.com/devuan/devuan_excalibur/installer-iso/', timeout=10)
+            r.raise_for_status()
+            
+            # Find ISO files with pattern: devuan_excalibur_VERSION_amd64_VARIANT.iso
+            # Pattern: devuan_excalibur_6.1.0_amd64_desktop.iso
+            matches = re.findall(r'devuan_excalibur_([\d.]+)_amd64', r.text)
+            
+            if matches:
+                # Remove duplicates and sort by version (handle semantic versioning)
+                versions = sorted(set(matches), key=lambda x: tuple(map(int, x.split('.'))))
+                return versions[-1]  # Return highest version
+        except Exception as e:
+            print(f"    Error fetching Devuan version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Devuan download links for available variants."""
+        if not version:
+            return []
+        
+        links = []
+        base_url = f"https://mirror.leaseweb.com/devuan/devuan_excalibur/installer-iso"
+        
+        # Common Devuan variants on mirrors
+        variants = ['desktop', 'netinst', 'server']
+        
+        try:
+            r = requests.get(f'{base_url}/', timeout=10)
+            r.raise_for_status()
+            
+            # Find actual available ISOs for this version
+            available_isos = re.findall(
+                rf'href="(devuan_excalibur_{re.escape(version)}_amd64[^"]*\.iso)"',
+                r.text
+            )
+            
+            if available_isos:
+                for iso in sorted(available_isos):
+                    links.append(f"- [{iso}]({base_url}/{iso})")
+            else:
+                # Fallback to known variant pattern if not found
+                for variant in variants:
+                    iso_name = f"devuan_excalibur_{version}_amd64_{variant}.iso"
+                    links.append(f"- [{iso_name}]({base_url}/{iso_name})")
+        except Exception as e:
+            print(f"    Warning: Could not fetch Devuan ISOs: {e}")
+            # Return fallback links
+            for variant in variants:
+                iso_name = f"devuan_excalibur_{version}_amd64_{variant}.iso"
+                links.append(f"- [{iso_name}]({base_url}/{iso_name})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Devuan section."""
+        return DistroUpdater.simple_update_section(content, 'Devuan', links, metadata)
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
@@ -1190,4 +1259,5 @@ DISTRO_UPDATERS = {
     'EndeavourOS': EndeavourOSUpdater,
     'Zorin OS': ZorinOSUpdater,
     'FreeDOS': FreeDOSUpdater,
+    'Devuan': DevuanUpdater,
 }
