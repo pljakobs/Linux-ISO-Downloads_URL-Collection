@@ -1958,6 +1958,321 @@ class OPNsenseUpdater(DistroUpdater):
         return DistroUpdater.simple_update_section(content, 'OPNsense', links, metadata)
 
 
+class PfSenseUpdater(DistroUpdater):
+    """Updater for pfSense (firewall/router)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest pfSense version."""
+        try:
+            r = requests.get('https://www.pfsense.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "2.7", "2.8"
+            match = re.search(r'pfSense[- ]CE[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching pfSense version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate pfSense download links."""
+        if not version:
+            return []
+        
+        url = f"https://nyifiles.netgate.com/mirror/downloads/pfSense-CE-{version}-RELEASE-amd64.iso.gz"
+        return [f"- [pfSense {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update pfSense section."""
+        return DistroUpdater.simple_update_section(content, 'pfSense', links, metadata)
+
+
+class TrueNASUpdater(DistroUpdater):
+    """Updater for TrueNAS Core (storage appliance)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest TrueNAS Core version."""
+        try:
+            r = requests.get('https://www.truenas.com/download-tn-core/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "12.0", "13.0"
+            match = re.search(r'TrueNAS[- ]Core[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching TrueNAS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate TrueNAS download links."""
+        if not version:
+            return []
+        
+        # Format version string for URL
+        version_url = version.replace('.', '-')
+        url = f"https://download.truenas.com/TrueNAS-CORE-{version}/TrueNAS-{version}-CORE.iso"
+        return [f"- [TrueNAS Core {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update TrueNAS section."""
+        return DistroUpdater.simple_update_section(content, 'TrueNAS Core', links, metadata)
+
+
+class FinnixUpdater(DistroUpdater):
+    """Updater for Finnix (rescue system)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Finnix version."""
+        try:
+            r = requests.get('https://www.finnix.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "126", "127"
+            match = re.search(r'Finnix[- ](\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Finnix version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Finnix download links."""
+        if not version:
+            return []
+        
+        url = f"https://www.finnix.org/releases/{version}/finnix-{version}.iso"
+        return [f"- [Finnix {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Finnix section."""
+        return DistroUpdater.simple_update_section(content, 'Finnix', links, metadata)
+
+
+class KNOPPIXUpdater(DistroUpdater):
+    """Updater for KNOPPIX (live system)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest KNOPPIX version."""
+        try:
+            r = requests.get('http://www.knopper.net/knoppix-mirrors/index-en.html', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "9.1", "10.0"
+            match = re.search(r'KNOPPIX[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching KNOPPIX version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate KNOPPIX download links."""
+        if not version:
+            return []
+        
+        url = f"http://www.knopper.net/knoppix/KNOPPIX_{version}-2024-01-15-en.iso"
+        return [f"- [KNOPPIX {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update KNOPPIX section."""
+        return DistroUpdater.simple_update_section(content, 'KNOPPIX', links, metadata)
+
+
+class NobaraProjectUpdater(DistroUpdater):
+    """Updater for Nobara Project (Fedora variant)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Nobara version from GitHub."""
+        try:
+            r = requests.get('https://api.github.com/repos/nobaraproject/nobara-images/releases/latest', timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            
+            if 'tag_name' in data:
+                return data['tag_name'].lstrip('v')
+        except Exception as e:
+            print(f"    Error fetching Nobara version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Nobara download links."""
+        if not version:
+            return []
+        
+        url = f"https://github.com/nobaraproject/nobara-images/releases/download/{version}/Nobara-{version}.iso"
+        return [f"- [Nobara {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Nobara Project section."""
+        return DistroUpdater.simple_update_section(content, 'Nobara Project', links, metadata)
+
+
+class GarudaLinuxUpdater(DistroUpdater):
+    """Updater for Garuda Linux (Arch variant)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Garuda Linux version."""
+        try:
+            r = requests.get('https://builds.garudalinux.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version/date like "240715"
+            match = re.search(r'garuda-gnome-linux-zen-(\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Garuda Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Garuda Linux download links."""
+        if not version:
+            return []
+        
+        editions = [('GNOME', 'gnome'), ('KDE', 'kde'), ('Sway', 'sway')]
+        links = []
+        base_url = "https://builds.garudalinux.org/iso/garuda"
+        
+        for name, variant in editions:
+            url = f"{base_url}/{variant}/{version}/garuda-{variant}-linux-zen-{version}.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Garuda Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Garuda Linux', links, metadata)
+
+
+class BlackArchUpdater(DistroUpdater):
+    """Updater for BlackArch (security framework)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest BlackArch version."""
+        try:
+            r = requests.get('https://mirrors.blackarch.org/blackarch/iso/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "2023.07.01"
+            match = re.search(r'blackarch-linux[^-]*-(\d{4}\.\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching BlackArch version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate BlackArch download links."""
+        if not version:
+            return []
+        
+        url = f"https://blackarch.org/iso/blackarch-linux-full-{version}-x86_64.iso"
+        return [f"- [BlackArch {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update BlackArch section."""
+        return DistroUpdater.simple_update_section(content, 'BlackArch', links, metadata)
+
+
+class CAINEUpdater(DistroUpdater):
+    """Updater for CAINE (forensics platform)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest CAINE version."""
+        try:
+            r = requests.get('https://caine.sourceforge.io/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "13.0"
+            match = re.search(r'CAINE[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching CAINE version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate CAINE download links."""
+        if not version:
+            return []
+        
+        major_version = version.split('.')[0]
+        url = f"https://mirror.0x.sg/parrot/iso/caine/caine{major_version}.0.iso"
+        return [f"- [CAINE {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update CAINE section."""
+        return DistroUpdater.simple_update_section(content, 'CAINE', links, metadata)
+
+
+class DragonFlyBSDUpdater(DistroUpdater):
+    """Updater for DragonFly BSD."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest DragonFly BSD version."""
+        try:
+            r = requests.get('https://mirror-master.dragonflybsd.org/iso-images/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "6.4.0"
+            match = re.search(r'dfly-x86_64-(\d+\.\d+\.\d+)_REL\.iso\.bz2', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching DragonFly BSD version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate DragonFly BSD download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirror-master.dragonflybsd.org/iso-images/dfly-x86_64-{version}_REL.iso.bz2"
+        return [f"- [DragonFly BSD {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update DragonFly BSD section."""
+        return DistroUpdater.simple_update_section(content, 'DragonFly BSD', links, metadata)
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
@@ -1999,4 +2314,13 @@ DISTRO_UPDATERS = {
     'Void Linux': VoidLinuxUpdater,
     'Clear Linux': ClearLinuxUpdater,
     'OPNsense': OPNsenseUpdater,
+    'pfSense': PfSenseUpdater,
+    'TrueNAS Core': TrueNASUpdater,
+    'Finnix': FinnixUpdater,
+    'KNOPPIX': KNOPPIXUpdater,
+    'Nobara Project': NobaraProjectUpdater,
+    'Garuda Linux': GarudaLinuxUpdater,
+    'BlackArch': BlackArchUpdater,
+    'CAINE': CAINEUpdater,
+    'DragonFly BSD': DragonFlyBSDUpdater,
 }
