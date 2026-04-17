@@ -1239,6 +1239,370 @@ class DevuanUpdater(DistroUpdater):
         return DistroUpdater.simple_update_section(content, 'Devuan', links, metadata)
 
 
+class ElementaryOSUpdater(DistroUpdater):
+    """Updater for elementary OS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest elementary OS version from GitHub releases."""
+        try:
+            r = requests.get('https://api.github.com/repos/elementary/os/releases/latest', timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            
+            # Extract version from tag_name like "7.0" or "7.1.0"
+            if 'tag_name' in data:
+                return data['tag_name'].lstrip('v')
+        except Exception as e:
+            print(f"    Error fetching elementary OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate elementary OS download links."""
+        if not version:
+            return []
+        
+        link = f"https://github.com/elementary/os/releases/download/{version}/elementaryos-{version}-stable.iso"
+        return [f"- [elementary OS {version}]({link})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update elementary OS section."""
+        return DistroUpdater.simple_update_section(content, 'elementary OS', links, metadata)
+
+
+class DeepinUpdater(DistroUpdater):
+    """Updater for Deepin."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Deepin version."""
+        try:
+            r = requests.get('https://www.deepin.org/en/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version pattern like "Deepin 20.9", "Deepin 23"
+            match = re.search(r'Deepin[- ](\d+\.?\d*)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Deepin version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Deepin download links."""
+        if not version:
+            return []
+        
+        # Deepin uses CDN downloads
+        major_version = version.split('.')[0]
+        url = f"https://cdimage.deepin.com/releases/{version}/deepin-desktop-community-{version}-amd64.iso"
+        return [f"- [Deepin {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Deepin section."""
+        return DistroUpdater.simple_update_section(content, 'Deepin', links, metadata)
+
+
+class SolusUpdater(DistroUpdater):
+    """Updater for Solus."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Solus version."""
+        try:
+            r = requests.get('https://getsol.us/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "4.4" from download page
+            match = re.search(r'Solus[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Solus version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Solus download links."""
+        if not version:
+            return []
+        
+        # Solus provides multiple editions
+        editions = ['Budgie', 'GNOME', 'KDE', 'MATE']
+        links = []
+        
+        for edition in editions:
+            url = f"https://mirrors.getsolus.us/releases/{version}/Solus-{version}-{edition}.iso"
+            links.append(f"- [{edition}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Solus section."""
+        return DistroUpdater.simple_update_section(content, 'Solus', links, metadata)
+
+
+class NixOSUpdater(DistroUpdater):
+    """Updater for NixOS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest NixOS version."""
+        try:
+            r = requests.get('https://nixos.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "24.05"
+            match = re.search(r'(\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching NixOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate NixOS download links."""
+        if not version:
+            return []
+        
+        links = []
+        base_url = f"https://channels.nixos.org/nixos-{version}/latest-nixos"
+        
+        variants = [
+            ('GNOME', 'gnome'),
+            ('KDE Plasma', 'plasma5'),
+            ('Minimal', 'minimal'),
+            ('Xfce', 'xfce')
+        ]
+        
+        for name, variant in variants:
+            url = f"{base_url}-{variant}-x86_64-linux.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update NixOS section."""
+        return DistroUpdater.simple_update_section(content, 'NixOS', links, metadata)
+
+
+class SlackwareUpdater(DistroUpdater):
+    """Updater for Slackware."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Slackware version."""
+        try:
+            r = requests.get('https://mirrors.slackware.com/slackware/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version directories like "slackware64-15.0"
+            versions = re.findall(r'href="slackware64-(\d+\.\d+)"', r.text)
+            if versions:
+                return sorted(versions, key=lambda x: tuple(map(int, x.split('.'))))[-1]
+        except Exception as e:
+            print(f"    Error fetching Slackware version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Slackware download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirrors.slackware.com/slackware/slackware64-{version}-iso/slackware64-{version}-install-dvd.iso"
+        return [f"- [Slackware {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Slackware section."""
+        return DistroUpdater.simple_update_section(content, 'Slackware', links, metadata)
+
+
+class GentooUpdater(DistroUpdater):
+    """Updater for Gentoo."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Gentoo ISO date."""
+        try:
+            r = requests.get('https://www.gentoo.org/downloads/', timeout=10)
+            r.raise_for_status()
+            
+            # Find ISO date like "20240101"
+            match = re.search(r'(\d{8})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Gentoo version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Gentoo download links."""
+        if not version:
+            return []
+        
+        url = f"https://bouncer.gentoo.org/fetch/root/all/releases/amd64/autobuilds/20240704T170428Z/install-amd64-minimal-{version}.iso"
+        return [f"- [Gentoo Minimal ISO]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Gentoo section."""
+        return DistroUpdater.simple_update_section(content, 'Gentoo', links, metadata)
+
+
+class CentOSUpdater(DistroUpdater):
+    """Updater for CentOS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest CentOS version."""
+        try:
+            r = requests.get('https://www.centos.org/download/mirrors/', timeout=10)
+            r.raise_for_status()
+            
+            # CentOS versions like "8", "9"
+            match = re.search(r'CentOS[- ](\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching CentOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate CentOS download links."""
+        if not version:
+            return []
+        
+        # CentOS provides different edition ISOs
+        url = f"https://mirror.centos.org/centos/{version}/isos/x86_64/CentOS-{version}-dvd1.iso"
+        return [f"- [CentOS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update CentOS section."""
+        return DistroUpdater.simple_update_section(content, 'CentOS', links, metadata)
+
+
+class QubesOSUpdater(DistroUpdater):
+    """Updater for Qubes OS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Qubes OS version."""
+        try:
+            r = requests.get('https://www.qubes-os.org/downloads/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "4.2", "5.0"
+            match = re.search(r'Qubes OS[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Qubes OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Qubes OS download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirrors.edge.kernel.org/qubes/iso/Qubes-R{version}-x86_64.iso"
+        return [f"- [Qubes OS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Qubes OS section."""
+        return DistroUpdater.simple_update_section(content, 'Qubes OS', links, metadata)
+
+
+class AlmaLinuxUpdater(DistroUpdater):
+    """Updater for AlmaLinux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest AlmaLinux version."""
+        try:
+            r = requests.get('https://wiki.almalinux.org/release-notes/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "8.5", "9.0"
+            match = re.search(r'AlmaLinux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching AlmaLinux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate AlmaLinux download links."""
+        if not version:
+            return []
+        
+        major_version = version.split('.')[0]
+        url = f"https://repo.almalinux.org/almalinux/{major_version}/isos/x86_64/AlmaLinux-{version}-x86_64-dvd.iso"
+        return [f"- [AlmaLinux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update AlmaLinux section."""
+        return DistroUpdater.simple_update_section(content, 'AlmaLinux', links, metadata)
+
+
+class ProxmoxVEUpdater(DistroUpdater):
+    """Updater for Proxmox VE."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Proxmox VE version."""
+        try:
+            r = requests.get('https://www.proxmox.com/en/downloads/category/iso-images-pve', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "8.2", "7.4"
+            match = re.search(r'Proxmox[- ]VE[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Proxmox VE version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Proxmox VE download links."""
+        if not version:
+            return []
+        
+        url = f"https://enterprise.proxmox.com/debian/dists/bookworm/pve-no-subscription/ISO/proxmox-ve_{version}-1.iso"
+        return [f"- [Proxmox VE {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Proxmox VE section."""
+        return DistroUpdater.simple_update_section(content, 'Proxmox VE', links, metadata)
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
@@ -1260,4 +1624,14 @@ DISTRO_UPDATERS = {
     'Zorin OS': ZorinOSUpdater,
     'FreeDOS': FreeDOSUpdater,
     'Devuan': DevuanUpdater,
+    'elementary OS': ElementaryOSUpdater,
+    'Deepin': DeepinUpdater,
+    'Solus': SolusUpdater,
+    'NixOS': NixOSUpdater,
+    'Slackware': SlackwareUpdater,
+    'Gentoo': GentooUpdater,
+    'CentOS': CentOSUpdater,
+    'Qubes OS': QubesOSUpdater,
+    'AlmaLinux': AlmaLinuxUpdater,
+    'Proxmox VE': ProxmoxVEUpdater,
 }
