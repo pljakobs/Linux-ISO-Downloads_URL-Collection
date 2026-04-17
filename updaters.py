@@ -2641,6 +2641,349 @@ class MageiaUpdater(DistroUpdater):
         return DistroUpdater.simple_update_section(content, 'Mageia', links, metadata)
 
 
+class NitruxUpdater(DistroUpdater):
+    """Updater for Nitrux (NX Desktop)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Nitrux version."""
+        try:
+            r = requests.get('https://nxos.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Nitrux[- ](?:NX[- ])?(\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Nitrux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Nitrux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/nitrux/files/Nitrux-{version}-x86_64.iso"
+        return [f"- [Nitrux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Nitrux section."""
+        return DistroUpdater.simple_update_section(content, 'Nitrux', links, metadata)
+
+
+class OpenMandrvivaUpdater(DistroUpdater):
+    """Updater for OpenMandriva."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest OpenMandriva version."""
+        try:
+            r = requests.get('https://www.openmandriva.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "4.3", "5.0"
+            match = re.search(r'OpenMandriva[- ](?:Lx[- ])?(\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching OpenMandriva version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate OpenMandriva download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('GNOME', 'gnome'),
+            ('KDE', 'kde'),
+            ('XFCE', 'xfce')
+        ]
+        
+        links = []
+        base_url = f"https://mirror.openmandriva.org/releases/{version}/images"
+        
+        for name, variant in editions:
+            url = f"{base_url}/OpenMandrivaLx.{version}.{variant}.x86_64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update OpenMandriva section."""
+        return DistroUpdater.simple_update_section(content, 'OpenMandriva', links, metadata)
+
+
+class SparkyLinuxUpdater(DistroUpdater):
+    """Updater for SparkyLinux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest SparkyLinux version."""
+        try:
+            r = requests.get('https://sparkylinux.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version/date
+            match = re.search(r'SparkyLinux[- ](\d{4}\.\d{2}(?:\.\d{2})?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching SparkyLinux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate SparkyLinux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/sparkylinux/files/SparkyLinux-{version}-x86_64.iso"
+        return [f"- [SparkyLinux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update SparkyLinux section."""
+        return DistroUpdater.simple_update_section(content, 'SparkyLinux', links, metadata)
+
+
+class CalculateLinuxUpdater(DistroUpdater):
+    """Updater for Calculate Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Calculate Linux version."""
+        try:
+            r = requests.get('https://www.calculate-linux.org/main/en/download', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Calculate[- ]Linux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Calculate Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Calculate Linux download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('Desktop', 'desktop'),
+            ('Server', 'server'),
+            ('Scratch', 'scratch')
+        ]
+        
+        links = []
+        base_url = f"https://mirror.calculate-linux.org/releases/CLD/{version}"
+        
+        for name, variant in editions:
+            url = f"{base_url}/calculate-cld-{version.replace('.', '')}-{variant}_x86-64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Calculate Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Calculate Linux', links, metadata)
+
+
+class PuppyLinuxUpdater(DistroUpdater):
+    """Updater for Puppy Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Puppy Linux version."""
+        try:
+            r = requests.get('https://puppylinux.com/index.html', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "9.5", "10.0"
+            match = re.search(r'Puppy[- ]Linux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Puppy Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Puppy Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/puppylinux/files/puppy-{version}/puppy-{version}-amd64.iso"
+        return [f"- [Puppy Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Puppy Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Puppy Linux', links, metadata)
+
+
+class TinyCoreLinuxUpdater(DistroUpdater):
+    """Updater for Tiny Core Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Tiny Core Linux version."""
+        try:
+            r = requests.get('http://tinycorelinux.net/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "13.x", "14.x"
+            match = re.search(r'Tiny[- ]Core[- ]Linux[- ](\d+\.x)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Tiny Core Linux version: {e}")
+        
+        return "13.x"  # Fallback
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Tiny Core Linux download links."""
+        if not version:
+            version = "13.x"
+        
+        url = f"http://tinycorelinux.net/{version}/x86/release/TinyCore-current.iso"
+        return [f"- [Tiny Core Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Tiny Core Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Tiny Core Linux', links, metadata)
+
+
+class RHELUpdater(DistroUpdater):
+    """Updater for Red Hat Enterprise Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest RHEL version."""
+        try:
+            # RHEL downloads typically require authentication
+            # We'll check the known versions page
+            r = requests.get('https://access.redhat.com/downloads/content/479/ver=/rhel---/', timeout=10)
+            r.raise_for_status()
+            
+            # Find RHEL version like "9.0", "8.5"
+            match = re.search(r'RHEL[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching RHEL version: {e}")
+        
+        return "9.0"  # Fallback to latest known
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate RHEL download links (placeholder)."""
+        if not version:
+            version = "9.0"
+        
+        link = f"https://access.redhat.com/downloads/content/479/ver=/rhel---/{version}/x86_64/product-software/"
+        return [f"- [RHEL {version} (requires Red Hat account)]({link})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update RHEL section."""
+        return DistroUpdater.simple_update_section(content, 'Red Hat Enterprise Linux', links, metadata)
+
+
+class EndlessOSUpdater(DistroUpdater):
+    """Updater for Endless OS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Endless OS version."""
+        try:
+            r = requests.get('https://www.endlessm.com/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Endless[- ]OS[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Endless OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Endless OS download links."""
+        if not version:
+            return []
+        
+        url = f"https://images-dl.endlessm.com/torrents/eos-eos{version}-amd64-amd64.iso.torrent"
+        return [f"- [Endless OS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Endless OS section."""
+        return DistroUpdater.simple_update_section(content, 'Endless OS', links, metadata)
+
+
+class XubuntuUpdater(DistroUpdater):
+    """Updater for Xubuntu (Ubuntu with Xfce)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Xubuntu version."""
+        try:
+            r = requests.get('https://xubuntu.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find LTS version like "24.04", "22.04"
+            match = re.search(r'Xubuntu[- ](?:LTS[- ])?(\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Xubuntu version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Xubuntu download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('Desktop', 'desktop'),
+            ('Minimal', 'minimal')
+        ]
+        
+        links = []
+        base_url = f"https://cdimage.ubuntu.com/xubuntu/releases/{version}/release"
+        
+        for name, variant in editions:
+            url = f"{base_url}/xubuntu-{version}-{variant}-amd64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Xubuntu section."""
+        return DistroUpdater.simple_update_section(content, 'Xubuntu', links, metadata)
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
@@ -2701,4 +3044,13 @@ DISTRO_UPDATERS = {
     'Septor': SeptorUpdater,
     'PureOS': PureOSUpdater,
     'Mageia': MageiaUpdater,
+    'Nitrux': NitruxUpdater,
+    'OpenMandriva': OpenMandrvivaUpdater,
+    'SparkyLinux': SparkyLinuxUpdater,
+    'Calculate Linux': CalculateLinuxUpdater,
+    'Puppy Linux': PuppyLinuxUpdater,
+    'Tiny Core Linux': TinyCoreLinuxUpdater,
+    'Red Hat Enterprise Linux': RHELUpdater,
+    'Endless OS': EndlessOSUpdater,
+    'Xubuntu': XubuntuUpdater,
 }
