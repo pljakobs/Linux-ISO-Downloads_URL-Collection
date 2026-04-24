@@ -1170,6 +1170,1820 @@ class RockyCloudUpdater(DistroUpdater):
         return content
 
 
+class DevuanUpdater(DistroUpdater):
+    """Updater for Devuan (Debian fork without systemd)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Devuan version from mirror."""
+        try:
+            # Check the installer-iso directory for latest ISOs
+            r = requests.get('https://mirror.leaseweb.com/devuan/devuan_excalibur/installer-iso/', timeout=10)
+            r.raise_for_status()
+            
+            # Find ISO files with pattern: devuan_excalibur_VERSION_amd64_VARIANT.iso
+            # Pattern: devuan_excalibur_6.1.0_amd64_desktop.iso
+            matches = re.findall(r'devuan_excalibur_([\d.]+)_amd64', r.text)
+            
+            if matches:
+                # Remove duplicates and sort by version (handle semantic versioning)
+                versions = sorted(set(matches), key=lambda x: tuple(map(int, x.split('.'))))
+                return versions[-1]  # Return highest version
+        except Exception as e:
+            print(f"    Error fetching Devuan version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Devuan download links for available variants."""
+        if not version:
+            return []
+        
+        links = []
+        base_url = f"https://mirror.leaseweb.com/devuan/devuan_excalibur/installer-iso"
+        
+        # Common Devuan variants on mirrors
+        variants = ['desktop', 'netinst', 'server']
+        
+        try:
+            r = requests.get(f'{base_url}/', timeout=10)
+            r.raise_for_status()
+            
+            # Find actual available ISOs for this version
+            available_isos = re.findall(
+                rf'href="(devuan_excalibur_{re.escape(version)}_amd64[^"]*\.iso)"',
+                r.text
+            )
+            
+            if available_isos:
+                for iso in sorted(available_isos):
+                    links.append(f"- [{iso}]({base_url}/{iso})")
+            else:
+                # Fallback to known variant pattern if not found
+                for variant in variants:
+                    iso_name = f"devuan_excalibur_{version}_amd64_{variant}.iso"
+                    links.append(f"- [{iso_name}]({base_url}/{iso_name})")
+        except Exception as e:
+            print(f"    Warning: Could not fetch Devuan ISOs: {e}")
+            # Return fallback links
+            for variant in variants:
+                iso_name = f"devuan_excalibur_{version}_amd64_{variant}.iso"
+                links.append(f"- [{iso_name}]({base_url}/{iso_name})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Devuan section."""
+        return DistroUpdater.simple_update_section(content, 'Devuan', links, metadata)
+
+
+class ElementaryOSUpdater(DistroUpdater):
+    """Updater for elementary OS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest elementary OS version from GitHub releases."""
+        try:
+            r = requests.get('https://api.github.com/repos/elementary/os/releases/latest', timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            
+            # Extract version from tag_name like "7.0" or "7.1.0"
+            if 'tag_name' in data:
+                return data['tag_name'].lstrip('v')
+        except Exception as e:
+            print(f"    Error fetching elementary OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate elementary OS download links."""
+        if not version:
+            return []
+        
+        link = f"https://github.com/elementary/os/releases/download/{version}/elementaryos-{version}-stable.iso"
+        return [f"- [elementary OS {version}]({link})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update elementary OS section."""
+        return DistroUpdater.simple_update_section(content, 'elementary OS', links, metadata)
+
+
+class DeepinUpdater(DistroUpdater):
+    """Updater for Deepin."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Deepin version."""
+        try:
+            r = requests.get('https://www.deepin.org/en/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version pattern like "Deepin 20.9", "Deepin 23"
+            match = re.search(r'Deepin[- ](\d+\.?\d*)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Deepin version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Deepin download links."""
+        if not version:
+            return []
+        
+        # Deepin uses CDN downloads
+        major_version = version.split('.')[0]
+        url = f"https://cdimage.deepin.com/releases/{version}/deepin-desktop-community-{version}-amd64.iso"
+        return [f"- [Deepin {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Deepin section."""
+        return DistroUpdater.simple_update_section(content, 'Deepin', links, metadata)
+
+
+class SolusUpdater(DistroUpdater):
+    """Updater for Solus."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Solus version."""
+        try:
+            r = requests.get('https://getsol.us/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "4.4" from download page
+            match = re.search(r'Solus[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Solus version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Solus download links."""
+        if not version:
+            return []
+        
+        # Solus provides multiple editions
+        editions = ['Budgie', 'GNOME', 'KDE', 'MATE']
+        links = []
+        
+        for edition in editions:
+            url = f"https://mirrors.getsolus.us/releases/{version}/Solus-{version}-{edition}.iso"
+            links.append(f"- [{edition}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Solus section."""
+        return DistroUpdater.simple_update_section(content, 'Solus', links, metadata)
+
+
+class NixOSUpdater(DistroUpdater):
+    """Updater for NixOS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest NixOS version."""
+        try:
+            r = requests.get('https://nixos.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "24.05"
+            match = re.search(r'(\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching NixOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate NixOS download links."""
+        if not version:
+            return []
+        
+        links = []
+        base_url = f"https://channels.nixos.org/nixos-{version}/latest-nixos"
+        
+        variants = [
+            ('GNOME', 'gnome'),
+            ('KDE Plasma', 'plasma5'),
+            ('Minimal', 'minimal'),
+            ('Xfce', 'xfce')
+        ]
+        
+        for name, variant in variants:
+            url = f"{base_url}-{variant}-x86_64-linux.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update NixOS section."""
+        return DistroUpdater.simple_update_section(content, 'NixOS', links, metadata)
+
+
+class SlackwareUpdater(DistroUpdater):
+    """Updater for Slackware."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Slackware version."""
+        try:
+            r = requests.get('https://mirrors.slackware.com/slackware/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version directories like "slackware64-15.0"
+            versions = re.findall(r'href="slackware64-(\d+\.\d+)"', r.text)
+            if versions:
+                return sorted(versions, key=lambda x: tuple(map(int, x.split('.'))))[-1]
+        except Exception as e:
+            print(f"    Error fetching Slackware version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Slackware download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirrors.slackware.com/slackware/slackware64-{version}-iso/slackware64-{version}-install-dvd.iso"
+        return [f"- [Slackware {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Slackware section."""
+        return DistroUpdater.simple_update_section(content, 'Slackware', links, metadata)
+
+
+class GentooUpdater(DistroUpdater):
+    """Updater for Gentoo."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Gentoo ISO date."""
+        try:
+            r = requests.get('https://www.gentoo.org/downloads/', timeout=10)
+            r.raise_for_status()
+            
+            # Find ISO date like "20240101"
+            match = re.search(r'(\d{8})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Gentoo version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Gentoo download links."""
+        if not version:
+            return []
+        
+        url = f"https://bouncer.gentoo.org/fetch/root/all/releases/amd64/autobuilds/20240704T170428Z/install-amd64-minimal-{version}.iso"
+        return [f"- [Gentoo Minimal ISO]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Gentoo section."""
+        return DistroUpdater.simple_update_section(content, 'Gentoo', links, metadata)
+
+
+class CentOSUpdater(DistroUpdater):
+    """Updater for CentOS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest CentOS version."""
+        try:
+            r = requests.get('https://www.centos.org/download/mirrors/', timeout=10)
+            r.raise_for_status()
+            
+            # CentOS versions like "8", "9"
+            match = re.search(r'CentOS[- ](\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching CentOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate CentOS download links."""
+        if not version:
+            return []
+        
+        # CentOS provides different edition ISOs
+        url = f"https://mirror.centos.org/centos/{version}/isos/x86_64/CentOS-{version}-dvd1.iso"
+        return [f"- [CentOS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update CentOS section."""
+        return DistroUpdater.simple_update_section(content, 'CentOS', links, metadata)
+
+
+class QubesOSUpdater(DistroUpdater):
+    """Updater for Qubes OS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Qubes OS version."""
+        try:
+            r = requests.get('https://www.qubes-os.org/downloads/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "4.2", "5.0"
+            match = re.search(r'Qubes OS[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Qubes OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Qubes OS download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirrors.edge.kernel.org/qubes/iso/Qubes-R{version}-x86_64.iso"
+        return [f"- [Qubes OS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Qubes OS section."""
+        return DistroUpdater.simple_update_section(content, 'Qubes OS', links, metadata)
+
+
+class AlmaLinuxUpdater(DistroUpdater):
+    """Updater for AlmaLinux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest AlmaLinux version."""
+        try:
+            r = requests.get('https://wiki.almalinux.org/release-notes/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "8.5", "9.0"
+            match = re.search(r'AlmaLinux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching AlmaLinux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate AlmaLinux download links."""
+        if not version:
+            return []
+        
+        major_version = version.split('.')[0]
+        url = f"https://repo.almalinux.org/almalinux/{major_version}/isos/x86_64/AlmaLinux-{version}-x86_64-dvd.iso"
+        return [f"- [AlmaLinux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update AlmaLinux section."""
+        return DistroUpdater.simple_update_section(content, 'AlmaLinux', links, metadata)
+
+
+class ProxmoxVEUpdater(DistroUpdater):
+    """Updater for Proxmox VE."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Proxmox VE version."""
+        try:
+            r = requests.get('https://www.proxmox.com/en/downloads/category/iso-images-pve', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "8.2", "7.4"
+            match = re.search(r'Proxmox[- ]VE[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Proxmox VE version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Proxmox VE download links."""
+        if not version:
+            return []
+        
+        url = f"https://enterprise.proxmox.com/debian/dists/bookworm/pve-no-subscription/ISO/proxmox-ve_{version}-1.iso"
+        return [f"- [Proxmox VE {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Proxmox VE section."""
+        return DistroUpdater.simple_update_section(content, 'Proxmox VE', links, metadata)
+
+
+class TailsUpdater(DistroUpdater):
+    """Updater for Tails (The Amnesic Incognito Live System)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Tails version."""
+        try:
+            r = requests.get('https://tails.boum.org/news/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "Tails 6.5"
+            match = re.search(r'Tails[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Tails version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Tails download links."""
+        if not version:
+            return []
+        
+        url = f"https://iso-history.tails.boum.org/tails-amd64-{version}/tails-amd64-{version}.iso"
+        return [f"- [Tails {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Tails section."""
+        return DistroUpdater.simple_update_section(content, 'Tails', links, metadata)
+
+
+class ParrotOSUpdater(DistroUpdater):
+    """Updater for Parrot OS (security-focused)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Parrot OS version."""
+        try:
+            r = requests.get('https://www.parrotproject.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "6.1", "6.2"
+            match = re.search(r'Parrot[- ](?:Security[- ])?(\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Parrot OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Parrot OS download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('Home', 'home'),
+            ('Security', 'security'),
+            ('HTB', 'htb')
+        ]
+        
+        links = []
+        base_url = f"https://mirror.0x.sg/parrot/iso/testing"
+        
+        for name, edition in editions:
+            url = f"{base_url}/Parrot-{edition}-{version}_amd64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Parrot OS section."""
+        return DistroUpdater.simple_update_section(content, 'Parrot OS', links, metadata)
+
+
+class BackBoxUpdater(DistroUpdater):
+    """Updater for BackBox (penetration testing)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest BackBox version."""
+        try:
+            r = requests.get('https://www.backbox.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "8.1", "8.2"
+            match = re.search(r'BackBox[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching BackBox version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate BackBox download links."""
+        if not version:
+            return []
+        
+        url = f"https://backbox.mirror.garr.it/backbox-{version}-desktop-amd64.iso"
+        return [f"- [BackBox {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update BackBox section."""
+        return DistroUpdater.simple_update_section(content, 'BackBox', links, metadata)
+
+
+class BodhiLinuxUpdater(DistroUpdater):
+    """Updater for Bodhi Linux (lightweight)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Bodhi Linux version."""
+        try:
+            r = requests.get('https://www.bodhilinux.com/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "6.0", "7.0"
+            match = re.search(r'Bodhi[- ]Linux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Bodhi Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Bodhi Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/bodhilinux/files/bodhi-{version}-64.iso"
+        return [f"- [Bodhi Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Bodhi Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Bodhi Linux', links, metadata)
+
+
+class RescuezillaUpdater(DistroUpdater):
+    """Updater for Rescuezilla (backup and recovery)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Rescuezilla version from GitHub."""
+        try:
+            r = requests.get('https://api.github.com/repos/rescuezilla/rescuezilla/releases/latest', timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            
+            if 'tag_name' in data:
+                return data['tag_name'].lstrip('v')
+        except Exception as e:
+            print(f"    Error fetching Rescuezilla version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Rescuezilla download links."""
+        if not version:
+            return []
+        
+        url = f"https://github.com/rescuezilla/rescuezilla/releases/download/{version}/rescuezilla-{version}-64bit.noble.iso"
+        return [f"- [Rescuezilla {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Rescuezilla section."""
+        return DistroUpdater.simple_update_section(content, 'Rescuezilla', links, metadata)
+
+
+class GPartedLiveUpdater(DistroUpdater):
+    """Updater for GParted Live (partition tool)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest GParted Live version."""
+        try:
+            r = requests.get('https://sourceforge.net/projects/gparted/rss?path=/gparted-live/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "1.6.0-3"
+            match = re.search(r'gparted-live-(\d+\.\d+\.\d+-\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching GParted Live version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate GParted Live download links."""
+        if not version:
+            return []
+        
+        url = f"https://downloads.sourceforge.net/gparted/gparted-live-{version}-amd64.iso"
+        return [f"- [GParted Live {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update GParted Live section."""
+        return DistroUpdater.simple_update_section(content, 'GParted Live', links, metadata)
+
+
+class NetbootXyzUpdater(DistroUpdater):
+    """Updater for netboot.xyz (network boot loader)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest netboot.xyz version."""
+        try:
+            r = requests.get('https://boot.netboot.xyz/', timeout=10)
+            r.raise_for_status()
+            
+            # netboot.xyz doesn't have traditional versions, return "latest"
+            return "latest"
+        except Exception as e:
+            print(f"    Error checking netboot.xyz: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate netboot.xyz download links."""
+        if not version:
+            return []
+        
+        links = [
+            "- [ISO](https://boot.netboot.xyz/ipxe/netboot.xyz.iso)",
+            "- [Multiarch ISO](https://boot.netboot.xyz/ipxe/netboot.xyz-multiarch.iso)",
+            "- [IMG](https://boot.netboot.xyz/ipxe/netboot.xyz.img)",
+            "- [Multiarch IMG](https://boot.netboot.xyz/ipxe/netboot.xyz-multiarch.img)"
+        ]
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update netboot.xyz section."""
+        return DistroUpdater.simple_update_section(content, 'netboot.xyz', links, metadata)
+
+
+class VoidLinuxUpdater(DistroUpdater):
+    """Updater for Void Linux (independent distro)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Void Linux version."""
+        try:
+            r = requests.get('https://alpha.de.repo.voidlinux.org/live/current/', timeout=10)
+            r.raise_for_status()
+            
+            # Find ISO date like "20210930"
+            match = re.search(r'void-live-x86_64-(\d{8})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Void Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Void Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://alpha.de.repo.voidlinux.org/live/current/void-live-x86_64-{version}.iso"
+        return [f"- [Void Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Void Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Void Linux', links, metadata)
+
+
+class ClearLinuxUpdater(DistroUpdater):
+    """Updater for Clear Linux (minimal, performance-focused)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Clear Linux version."""
+        try:
+            r = requests.get('https://clearlinux.org/downloads', timeout=10)
+            r.raise_for_status()
+            
+            # Find version number
+            match = re.search(r'(\d{5})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Clear Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Clear Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://cdn.download.clearlinux.org/releases/{version}/clear/clear-{version}-live-server.iso"
+        return [f"- [Clear Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Clear Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Clear Linux', links, metadata)
+
+
+class OPNsenseUpdater(DistroUpdater):
+    """Updater for OPNsense (firewall/router)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest OPNsense version."""
+        try:
+            r = requests.get('https://mirror.opnsense.org/releases/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version directories like "23.7", "24.1"
+            versions = re.findall(r'href="(\d+\.\d+)/"', r.text)
+            if versions:
+                return sorted(versions, key=lambda x: tuple(map(int, x.split('.'))))[-1]
+        except Exception as e:
+            print(f"    Error fetching OPNsense version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate OPNsense download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirror.opnsense.org/releases/{version}/OPNsense-{version}-OpenSSL-dvd-amd64.iso.bz2"
+        return [f"- [OPNsense {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update OPNsense section."""
+        return DistroUpdater.simple_update_section(content, 'OPNsense', links, metadata)
+
+
+class PfSenseUpdater(DistroUpdater):
+    """Updater for pfSense (firewall/router)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest pfSense version."""
+        try:
+            r = requests.get('https://www.pfsense.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "2.7", "2.8"
+            match = re.search(r'pfSense[- ]CE[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching pfSense version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate pfSense download links."""
+        if not version:
+            return []
+        
+        url = f"https://nyifiles.netgate.com/mirror/downloads/pfSense-CE-{version}-RELEASE-amd64.iso.gz"
+        return [f"- [pfSense {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update pfSense section."""
+        return DistroUpdater.simple_update_section(content, 'pfSense', links, metadata)
+
+
+class TrueNASUpdater(DistroUpdater):
+    """Updater for TrueNAS Core (storage appliance)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest TrueNAS Core version."""
+        try:
+            r = requests.get('https://www.truenas.com/download-tn-core/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "12.0", "13.0"
+            match = re.search(r'TrueNAS[- ]Core[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching TrueNAS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate TrueNAS download links."""
+        if not version:
+            return []
+        
+        # Format version string for URL
+        version_url = version.replace('.', '-')
+        url = f"https://download.truenas.com/TrueNAS-CORE-{version}/TrueNAS-{version}-CORE.iso"
+        return [f"- [TrueNAS Core {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update TrueNAS section."""
+        return DistroUpdater.simple_update_section(content, 'TrueNAS Core', links, metadata)
+
+
+class FinnixUpdater(DistroUpdater):
+    """Updater for Finnix (rescue system)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Finnix version."""
+        try:
+            r = requests.get('https://www.finnix.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "126", "127"
+            match = re.search(r'Finnix[- ](\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Finnix version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Finnix download links."""
+        if not version:
+            return []
+        
+        url = f"https://www.finnix.org/releases/{version}/finnix-{version}.iso"
+        return [f"- [Finnix {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Finnix section."""
+        return DistroUpdater.simple_update_section(content, 'Finnix', links, metadata)
+
+
+class KNOPPIXUpdater(DistroUpdater):
+    """Updater for KNOPPIX (live system)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest KNOPPIX version."""
+        try:
+            r = requests.get('http://www.knopper.net/knoppix-mirrors/index-en.html', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "9.1", "10.0"
+            match = re.search(r'KNOPPIX[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching KNOPPIX version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate KNOPPIX download links."""
+        if not version:
+            return []
+        
+        url = f"http://www.knopper.net/knoppix/KNOPPIX_{version}-2024-01-15-en.iso"
+        return [f"- [KNOPPIX {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update KNOPPIX section."""
+        return DistroUpdater.simple_update_section(content, 'KNOPPIX', links, metadata)
+
+
+class NobaraProjectUpdater(DistroUpdater):
+    """Updater for Nobara Project (Fedora variant)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Nobara version from GitHub."""
+        try:
+            r = requests.get('https://api.github.com/repos/nobaraproject/nobara-images/releases/latest', timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            
+            if 'tag_name' in data:
+                return data['tag_name'].lstrip('v')
+        except Exception as e:
+            print(f"    Error fetching Nobara version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Nobara download links."""
+        if not version:
+            return []
+        
+        url = f"https://github.com/nobaraproject/nobara-images/releases/download/{version}/Nobara-{version}.iso"
+        return [f"- [Nobara {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Nobara Project section."""
+        return DistroUpdater.simple_update_section(content, 'Nobara Project', links, metadata)
+
+
+class GarudaLinuxUpdater(DistroUpdater):
+    """Updater for Garuda Linux (Arch variant)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Garuda Linux version."""
+        try:
+            r = requests.get('https://builds.garudalinux.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version/date like "240715"
+            match = re.search(r'garuda-gnome-linux-zen-(\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Garuda Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Garuda Linux download links."""
+        if not version:
+            return []
+        
+        editions = [('GNOME', 'gnome'), ('KDE', 'kde'), ('Sway', 'sway')]
+        links = []
+        base_url = "https://builds.garudalinux.org/iso/garuda"
+        
+        for name, variant in editions:
+            url = f"{base_url}/{variant}/{version}/garuda-{variant}-linux-zen-{version}.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Garuda Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Garuda Linux', links, metadata)
+
+
+class BlackArchUpdater(DistroUpdater):
+    """Updater for BlackArch (security framework)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest BlackArch version."""
+        try:
+            r = requests.get('https://mirrors.blackarch.org/blackarch/iso/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "2023.07.01"
+            match = re.search(r'blackarch-linux[^-]*-(\d{4}\.\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching BlackArch version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate BlackArch download links."""
+        if not version:
+            return []
+        
+        url = f"https://blackarch.org/iso/blackarch-linux-full-{version}-x86_64.iso"
+        return [f"- [BlackArch {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update BlackArch section."""
+        return DistroUpdater.simple_update_section(content, 'BlackArch', links, metadata)
+
+
+class CAINEUpdater(DistroUpdater):
+    """Updater for CAINE (forensics platform)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest CAINE version."""
+        try:
+            r = requests.get('https://caine.sourceforge.io/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "13.0"
+            match = re.search(r'CAINE[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching CAINE version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate CAINE download links."""
+        if not version:
+            return []
+        
+        major_version = version.split('.')[0]
+        url = f"https://mirror.0x.sg/parrot/iso/caine/caine{major_version}.0.iso"
+        return [f"- [CAINE {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update CAINE section."""
+        return DistroUpdater.simple_update_section(content, 'CAINE', links, metadata)
+
+
+class DragonFlyBSDUpdater(DistroUpdater):
+    """Updater for DragonFly BSD."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest DragonFly BSD version."""
+        try:
+            r = requests.get('https://mirror-master.dragonflybsd.org/iso-images/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "6.4.0"
+            match = re.search(r'dfly-x86_64-(\d+\.\d+\.\d+)_REL\.iso\.bz2', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching DragonFly BSD version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate DragonFly BSD download links."""
+        if not version:
+            return []
+        
+        url = f"https://mirror-master.dragonflybsd.org/iso-images/dfly-x86_64-{version}_REL.iso.bz2"
+        return [f"- [DragonFly BSD {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update DragonFly BSD section."""
+        return DistroUpdater.simple_update_section(content, 'DragonFly BSD', links, metadata)
+
+
+class ArtixLinuxUpdater(DistroUpdater):
+    """Updater for Artix Linux (init freedom)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Artix Linux version."""
+        try:
+            r = requests.get('https://artixlinux.org/download.php', timeout=10)
+            r.raise_for_status()
+            
+            # Find version/date like "2024.01.01"
+            match = re.search(r'Artix[- ](\d{4}\.\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Artix Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Artix Linux download links."""
+        if not version:
+            return []
+        
+        # Multiple editions available
+        editions = [
+            ('XFCE', 'xfce'),
+            ('LXQt', 'lxqt'),
+            ('KDE', 'kde'),
+            ('Openbox', 'openbox')
+        ]
+        
+        links = []
+        base_url = f"https://mirror.artixlinux.org/iso"
+        
+        for name, variant in editions:
+            url = f"{base_url}/artix-{version}-x86_64-{variant}.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Artix Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Artix Linux', links, metadata)
+
+
+class LXLEUpdater(DistroUpdater):
+    """Updater for LXLE (lightweight Ubuntu-based)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest LXLE version."""
+        try:
+            r = requests.get('https://www.lxle.net/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "18.04.3", "20.04"
+            match = re.search(r'LXLE[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching LXLE version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate LXLE download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/lxle/files/LXLE-{version}.iso"
+        return [f"- [LXLE {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update LXLE section."""
+        return DistroUpdater.simple_update_section(content, 'LXLE', links, metadata)
+
+
+class FerenOSUpdater(DistroUpdater):
+    """Updater for Feren OS (Ubuntu-based desktop)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Feren OS version."""
+        try:
+            r = requests.get('https://ferenos.weebly.com/download.html', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Feren[- ]OS[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Feren OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Feren OS download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/ferenos/files/Feren%20OS%20{version}/Feren-OS-{version}-x64.iso"
+        return [f"- [Feren OS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Feren OS section."""
+        return DistroUpdater.simple_update_section(content, 'Feren OS', links, metadata)
+
+
+class PeppermintOSUpdater(DistroUpdater):
+    """Updater for Peppermint OS (lightweight)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Peppermint OS version."""
+        try:
+            r = requests.get('https://peppermintos.com/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "12", "13"
+            match = re.search(r'Peppermint[- ](?:OS[- ])?(\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Peppermint OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Peppermint OS download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/peppermintos/files/Peppermint-{version}-20231215-x86_64.iso"
+        return [f"- [Peppermint OS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Peppermint OS section."""
+        return DistroUpdater.simple_update_section(content, 'Peppermint OS', links, metadata)
+
+
+class RedcoreLinuxUpdater(DistroUpdater):
+    """Updater for Redcore Linux (Gentoo/Arch hybrid)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Redcore Linux version."""
+        try:
+            r = requests.get('https://redcorelinux.org/download', timeout=10)
+            r.raise_for_status()
+            
+            # Find version/date
+            match = re.search(r'Redcore[- ]Linux[- ](\d{4}\.\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Redcore Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Redcore Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/redcorelinux/files/Redcore-Linux-{version}-x86_64.iso"
+        return [f"- [Redcore Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Redcore Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Redcore Linux', links, metadata)
+
+
+class GeckoLinuxUpdater(DistroUpdater):
+    """Updater for GeckoLinux (openSUSE variant)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest GeckoLinux version."""
+        try:
+            r = requests.get('https://geckolinux.github.io/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'GeckoLinux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching GeckoLinux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate GeckoLinux download links."""
+        if not version:
+            return []
+        
+        # Assuming openSUSE Leap based variant
+        url = f"https://download.opensuse.org/distribution/leap/15.5/iso/GeckoLinux-staticE-{version}-x86_64.iso"
+        return [f"- [GeckoLinux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update GeckoLinux section."""
+        return DistroUpdater.simple_update_section(content, 'GeckoLinux', links, metadata)
+
+
+class RebornOSUpdater(DistroUpdater):
+    """Updater for RebornOS (Arch-based)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest RebornOS version."""
+        try:
+            r = requests.get('https://rebornos.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version/date
+            match = re.search(r'RebornOS[- ](\d{4}\.\d{2}\.\d{2})', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching RebornOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate RebornOS download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/rebornos/files/RebornOS-{version}-x86_64.iso"
+        return [f"- [RebornOS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update RebornOS section."""
+        return DistroUpdater.simple_update_section(content, 'RebornOS', links, metadata)
+
+
+class SeptorUpdater(DistroUpdater):
+    """Updater for Septor (privacy-focused)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Septor version."""
+        try:
+            r = requests.get('https://septor.sourceforge.io/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Septor[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Septor version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Septor download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/septor/files/Septor-{version}.iso"
+        return [f"- [Septor {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Septor section."""
+        return DistroUpdater.simple_update_section(content, 'Septor', links, metadata)
+
+
+class PureOSUpdater(DistroUpdater):
+    """Updater for PureOS (freedom-focused)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest PureOS version."""
+        try:
+            r = requests.get('https://pureos.net/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "10", "11"
+            match = re.search(r'PureOS[- ](\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching PureOS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate PureOS download links."""
+        if not version:
+            return []
+        
+        url = f"https://images.pureos.net/pureos-{version}-gnome-live-x86_64.iso"
+        return [f"- [PureOS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update PureOS section."""
+        return DistroUpdater.simple_update_section(content, 'PureOS', links, metadata)
+
+
+class MageiaUpdater(DistroUpdater):
+    """Updater for Mageia (Mandriva fork)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Mageia version."""
+        try:
+            r = requests.get('https://www.mageia.org/en/downloads/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "8", "9"
+            match = re.search(r'Mageia[- ](\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Mageia version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Mageia download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('KDE', 'kde'),
+            ('GNOME', 'gnome'),
+            ('Xfce', 'xfce'),
+            ('Minimal', 'minimal')
+        ]
+        
+        links = []
+        base_url = f"https://mirrors.kernel.org/mageia/distrib/{version}/x86_64/media/live"
+        
+        for name, variant in editions:
+            url = f"{base_url}/Mageia-{version}-{variant}-x86_64-DVD.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Mageia section."""
+        return DistroUpdater.simple_update_section(content, 'Mageia', links, metadata)
+
+
+class NitruxUpdater(DistroUpdater):
+    """Updater for Nitrux (NX Desktop)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Nitrux version."""
+        try:
+            r = requests.get('https://nxos.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Nitrux[- ](?:NX[- ])?(\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Nitrux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Nitrux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/nitrux/files/Nitrux-{version}-x86_64.iso"
+        return [f"- [Nitrux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Nitrux section."""
+        return DistroUpdater.simple_update_section(content, 'Nitrux', links, metadata)
+
+
+class OpenMandrvivaUpdater(DistroUpdater):
+    """Updater for OpenMandriva."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest OpenMandriva version."""
+        try:
+            r = requests.get('https://www.openmandriva.org/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "4.3", "5.0"
+            match = re.search(r'OpenMandriva[- ](?:Lx[- ])?(\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching OpenMandriva version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate OpenMandriva download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('GNOME', 'gnome'),
+            ('KDE', 'kde'),
+            ('XFCE', 'xfce')
+        ]
+        
+        links = []
+        base_url = f"https://mirror.openmandriva.org/releases/{version}/images"
+        
+        for name, variant in editions:
+            url = f"{base_url}/OpenMandrivaLx.{version}.{variant}.x86_64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update OpenMandriva section."""
+        return DistroUpdater.simple_update_section(content, 'OpenMandriva', links, metadata)
+
+
+class SparkyLinuxUpdater(DistroUpdater):
+    """Updater for SparkyLinux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest SparkyLinux version."""
+        try:
+            r = requests.get('https://sparkylinux.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version/date
+            match = re.search(r'SparkyLinux[- ](\d{4}\.\d{2}(?:\.\d{2})?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching SparkyLinux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate SparkyLinux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/sparkylinux/files/SparkyLinux-{version}-x86_64.iso"
+        return [f"- [SparkyLinux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update SparkyLinux section."""
+        return DistroUpdater.simple_update_section(content, 'SparkyLinux', links, metadata)
+
+
+class CalculateLinuxUpdater(DistroUpdater):
+    """Updater for Calculate Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Calculate Linux version."""
+        try:
+            r = requests.get('https://www.calculate-linux.org/main/en/download', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Calculate[- ]Linux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Calculate Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Calculate Linux download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('Desktop', 'desktop'),
+            ('Server', 'server'),
+            ('Scratch', 'scratch')
+        ]
+        
+        links = []
+        base_url = f"https://mirror.calculate-linux.org/releases/CLD/{version}"
+        
+        for name, variant in editions:
+            url = f"{base_url}/calculate-cld-{version.replace('.', '')}-{variant}_x86-64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Calculate Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Calculate Linux', links, metadata)
+
+
+class PuppyLinuxUpdater(DistroUpdater):
+    """Updater for Puppy Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Puppy Linux version."""
+        try:
+            r = requests.get('https://puppylinux.com/index.html', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "9.5", "10.0"
+            match = re.search(r'Puppy[- ]Linux[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Puppy Linux version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Puppy Linux download links."""
+        if not version:
+            return []
+        
+        url = f"https://sourceforge.net/projects/puppylinux/files/puppy-{version}/puppy-{version}-amd64.iso"
+        return [f"- [Puppy Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Puppy Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Puppy Linux', links, metadata)
+
+
+class TinyCoreLinuxUpdater(DistroUpdater):
+    """Updater for Tiny Core Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Tiny Core Linux version."""
+        try:
+            r = requests.get('http://tinycorelinux.net/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version like "13.x", "14.x"
+            match = re.search(r'Tiny[- ]Core[- ]Linux[- ](\d+\.x)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Tiny Core Linux version: {e}")
+        
+        return "13.x"  # Fallback
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Tiny Core Linux download links."""
+        if not version:
+            version = "13.x"
+        
+        url = f"http://tinycorelinux.net/{version}/x86/release/TinyCore-current.iso"
+        return [f"- [Tiny Core Linux {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Tiny Core Linux section."""
+        return DistroUpdater.simple_update_section(content, 'Tiny Core Linux', links, metadata)
+
+
+class RHELUpdater(DistroUpdater):
+    """Updater for Red Hat Enterprise Linux."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest RHEL version."""
+        try:
+            # RHEL downloads typically require authentication
+            # We'll check the known versions page
+            r = requests.get('https://access.redhat.com/downloads/content/479/ver=/rhel---/', timeout=10)
+            r.raise_for_status()
+            
+            # Find RHEL version like "9.0", "8.5"
+            match = re.search(r'RHEL[- ](\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching RHEL version: {e}")
+        
+        return "9.0"  # Fallback to latest known
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate RHEL download links (placeholder)."""
+        if not version:
+            version = "9.0"
+        
+        link = f"https://access.redhat.com/downloads/content/479/ver=/rhel---/{version}/x86_64/product-software/"
+        return [f"- [RHEL {version} (requires Red Hat account)]({link})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update RHEL section."""
+        return DistroUpdater.simple_update_section(content, 'Red Hat Enterprise Linux', links, metadata)
+
+
+class EndlessOSUpdater(DistroUpdater):
+    """Updater for Endless OS."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Endless OS version."""
+        try:
+            r = requests.get('https://www.endlessm.com/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find version
+            match = re.search(r'Endless[- ]OS[- ](\d+\.\d+(?:\.\d+)?)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Endless OS version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Endless OS download links."""
+        if not version:
+            return []
+        
+        url = f"https://images-dl.endlessm.com/torrents/eos-eos{version}-amd64-amd64.iso.torrent"
+        return [f"- [Endless OS {version}]({url})"]
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Endless OS section."""
+        return DistroUpdater.simple_update_section(content, 'Endless OS', links, metadata)
+
+
+class XubuntuUpdater(DistroUpdater):
+    """Updater for Xubuntu (Ubuntu with Xfce)."""
+    
+    @staticmethod
+    def get_latest_version():
+        """Get latest Xubuntu version."""
+        try:
+            r = requests.get('https://xubuntu.org/download/', timeout=10)
+            r.raise_for_status()
+            
+            # Find LTS version like "24.04", "22.04"
+            match = re.search(r'Xubuntu[- ](?:LTS[- ])?(\d+\.\d+)', r.text)
+            if match:
+                return match.group(1)
+        except Exception as e:
+            print(f"    Error fetching Xubuntu version: {e}")
+        
+        return None
+    
+    @staticmethod
+    def generate_download_links(version):
+        """Generate Xubuntu download links."""
+        if not version:
+            return []
+        
+        editions = [
+            ('Desktop', 'desktop'),
+            ('Minimal', 'minimal')
+        ]
+        
+        links = []
+        base_url = f"https://cdimage.ubuntu.com/xubuntu/releases/{version}/release"
+        
+        for name, variant in editions:
+            url = f"{base_url}/xubuntu-{version}-{variant}-amd64.iso"
+            links.append(f"- [{name}]({url})")
+        
+        return links
+    
+    @staticmethod
+    def update_section(content, version, links, metadata=None):
+        """Update Xubuntu section."""
+        return DistroUpdater.simple_update_section(content, 'Xubuntu', links, metadata)
+
+
 # Registry of all updaters
 DISTRO_UPDATERS = {
     'Fedora': FedoraUpdater,
@@ -1190,4 +3004,53 @@ DISTRO_UPDATERS = {
     'EndeavourOS': EndeavourOSUpdater,
     'Zorin OS': ZorinOSUpdater,
     'FreeDOS': FreeDOSUpdater,
+    'Devuan': DevuanUpdater,
+    'elementary OS': ElementaryOSUpdater,
+    'Deepin': DeepinUpdater,
+    'Solus': SolusUpdater,
+    'NixOS': NixOSUpdater,
+    'Slackware': SlackwareUpdater,
+    'Gentoo': GentooUpdater,
+    'CentOS': CentOSUpdater,
+    'Qubes OS': QubesOSUpdater,
+    'AlmaLinux': AlmaLinuxUpdater,
+    'Proxmox VE': ProxmoxVEUpdater,
+    'Tails': TailsUpdater,
+    'Parrot OS': ParrotOSUpdater,
+    'BackBox': BackBoxUpdater,
+    'Bodhi Linux': BodhiLinuxUpdater,
+    'Rescuezilla': RescuezillaUpdater,
+    'GParted Live': GPartedLiveUpdater,
+    'netboot.xyz': NetbootXyzUpdater,
+    'Void Linux': VoidLinuxUpdater,
+    'Clear Linux': ClearLinuxUpdater,
+    'OPNsense': OPNsenseUpdater,
+    'pfSense': PfSenseUpdater,
+    'TrueNAS Core': TrueNASUpdater,
+    'Finnix': FinnixUpdater,
+    'KNOPPIX': KNOPPIXUpdater,
+    'Nobara Project': NobaraProjectUpdater,
+    'Garuda Linux': GarudaLinuxUpdater,
+    'BlackArch': BlackArchUpdater,
+    'CAINE': CAINEUpdater,
+    'DragonFly BSD': DragonFlyBSDUpdater,
+    'Artix Linux': ArtixLinuxUpdater,
+    'LXLE': LXLEUpdater,
+    'Feren OS': FerenOSUpdater,
+    'Peppermint OS': PeppermintOSUpdater,
+    'Redcore Linux': RedcoreLinuxUpdater,
+    'GeckoLinux': GeckoLinuxUpdater,
+    'RebornOS': RebornOSUpdater,
+    'Septor': SeptorUpdater,
+    'PureOS': PureOSUpdater,
+    'Mageia': MageiaUpdater,
+    'Nitrux': NitruxUpdater,
+    'OpenMandriva': OpenMandrvivaUpdater,
+    'SparkyLinux': SparkyLinuxUpdater,
+    'Calculate Linux': CalculateLinuxUpdater,
+    'Puppy Linux': PuppyLinuxUpdater,
+    'Tiny Core Linux': TinyCoreLinuxUpdater,
+    'Red Hat Enterprise Linux': RHELUpdater,
+    'Endless OS': EndlessOSUpdater,
+    'Xubuntu': XubuntuUpdater,
 }
