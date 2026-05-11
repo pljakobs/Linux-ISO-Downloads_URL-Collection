@@ -23,7 +23,7 @@ The following distributions are automatically updated with the latest versions:
 - ✓ Zorin OS
 - ✓ openSUSE
 
-*Last update check: 2026-05-04 00:32 UTC*
+*Last update check: 2026-05-11 00:34 UTC*
 
 ---
 
@@ -57,7 +57,7 @@ The following distributions are automatically updated with the latest versions:
 - [Minimal](https://cdimage.ubuntu.com/xubuntu/releases/24.04/release/xubuntu-24.04-minimal-amd64.iso)
 
 ## Kali Linux
-<!-- Auto-updated: 2026-05-04 00:33 UTC -->
+<!-- Auto-updated: 2026-05-11 00:35 UTC -->
 - [Live](https://archive.kali.org/kali-images/current/kali-linux-2026.1-live-amd64.iso)
 - [Installer (Purple)](https://archive.kali.org/kali-images/current/kali-linux-2026.1-installer-purple-amd64.iso)
 - [Installer (Netinst)](https://archive.kali.org/kali-images/current/kali-linux-2026.1-installer-netinst-amd64.iso)
@@ -118,7 +118,7 @@ The following distributions are automatically updated with the latest versions:
 
 
 ## Arch Linux
-<!-- Auto-updated: 2026-05-04 00:33 UTC -->
+<!-- Auto-updated: 2026-05-11 00:35 UTC -->
 - [Arch Linux 2026.05.01](https://geo.mirror.pkgbuild.com/iso/2026.05.01/archlinux-2026.05.01-x86_64.iso)
 
 ## Manjaro
@@ -127,13 +127,13 @@ The following distributions are automatically updated with the latest versions:
 - [GNOME 23.0](https://download.manjaro.org/gnome/23.0/manjaro-gnome-23.0-230701-linux61.iso)
 
 ## Linux Mint
-<!-- Auto-updated: 2026-05-04 00:33 UTC -->
+<!-- Auto-updated: 2026-05-11 00:35 UTC -->
 - [Cinnamon 22.3](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso)
 - [Mate 22.3](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso)
 - [Xfce 22.3](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso)
 
 ## Zorin OS
-<!-- Auto-updated: 2026-05-04 00:33 UTC -->
+<!-- Auto-updated: 2026-05-11 00:35 UTC -->
 - [Core 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Core-64-bit.iso)
 - [Lite 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Lite-64-bit.iso)
 
@@ -173,7 +173,7 @@ The following distributions are automatically updated with the latest versions:
 - [GNOME](https://channels.nixos.org/nixos-23.05/latest-nixos-gnome-x86_64-linux.iso)
 
 ## Alpine Linux
-<!-- Auto-updated: 2026-05-04 00:33 UTC -->
+<!-- Auto-updated: 2026-05-11 00:35 UTC -->
 - [Alpine 3.23.4](https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.4-x86_64.iso)
 
 ## Endless OS
@@ -219,7 +219,7 @@ The following distributions are automatically updated with the latest versions:
 - [DragonFly BSD 6.4.0](https://mirror-master.dragonflybsd.org/iso-images/dfly-x86_64-6.4.0_REL.iso.bz2)
 
 ## FreeDOS
-<!-- Auto-updated: 2026-05-04 00:33 UTC -->
+<!-- Auto-updated: 2026-05-11 00:35 UTC -->
 - [FD14-LiveCD.zip](https://download.freedos.org/1.4/FD14-LiveCD.zip)
 - [FD14-BonusCD.zip](https://download.freedos.org/1.4/FD14-BonusCD.zip)
 - [FD14-FullUSB.zip](https://download.freedos.org/1.4/FD14-FullUSB.zip)
@@ -273,7 +273,7 @@ The following distributions are automatically updated with the latest versions:
 - [KaOS](https://kaosx.us/download/)
 
 ## EndeavourOS
-<!-- Auto-updated: 2026-05-04 00:33 UTC -->
+<!-- Auto-updated: 2026-05-11 00:35 UTC -->
 - [EndeavourOS 2026.03.06](https://github.com/endeavouros-team/ISO/releases/latest/download/EndeavourOS_2026.03.06.iso)
 
 ## GeckoLinux
