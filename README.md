@@ -23,7 +23,7 @@ The following distributions are automatically updated with the latest versions:
 - ✓ Zorin OS
 - ✓ openSUSE
 
-*Last update check: 2026-11-02 00:12 UTC*
+*Last update check: 2026-11-09 00:13 UTC*
 
 ---
 
@@ -57,7 +57,7 @@ The following distributions are automatically updated with the latest versions:
 - [Minimal](https://cdimage.ubuntu.com/xubuntu/releases/24.04/release/xubuntu-24.04-minimal-amd64.iso)
 
 ## Kali Linux
-<!-- Auto-updated: 2026-11-02 00:13 UTC -->
+<!-- Auto-updated: 2026-11-09 00:14 UTC -->
 - [Live](https://archive.kali.org/kali-images/current/kali-linux-2026.3-live-amd64.iso)
 - [Installer (Purple)](https://archive.kali.org/kali-images/current/kali-linux-2026.3-installer-purple-amd64.iso)
 - [Installer (Netinst)](https://archive.kali.org/kali-images/current/kali-linux-2026.3-installer-netinst-amd64.iso)
@@ -76,7 +76,7 @@ The following distributions are automatically updated with the latest versions:
 - [BackBox 8.1](https://backbox.mirror.garr.it/backbox-8.1-desktop-amd64.iso)
 
 ## MX Linux
-<!-- Auto-updated: 2026-11-02 00:13 UTC -->
+<!-- Auto-updated: 2026-11-09 00:14 UTC -->
 - [MX-17.1 AHS](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-17.1_ahs_x64.iso)
 - [MX-17.1](http://ftp.u-strasbg.fr/linux/distributions/mxlinux/isos/MX/Final/Xfce/MX-17.1_x64.iso)
 
@@ -136,7 +136,7 @@ The following distributions are automatically updated with the latest versions:
 
 
 ## Arch Linux
-<!-- Auto-updated: 2026-11-02 00:13 UTC -->
+<!-- Auto-updated: 2026-11-09 00:14 UTC -->
 - [Arch Linux 2026.11.01](https://geo.mirror.pkgbuild.com/iso/2026.11.01/archlinux-2026.11.01-x86_64.iso)
 
 ## Manjaro
@@ -145,13 +145,13 @@ The following distributions are automatically updated with the latest versions:
 - [GNOME 23.0](https://download.manjaro.org/gnome/23.0/manjaro-gnome-23.0-230701-linux61.iso)
 
 ## Linux Mint
-<!-- Auto-updated: 2026-11-02 00:13 UTC -->
+<!-- Auto-updated: 2026-11-09 00:14 UTC -->
 - [Cinnamon 22.3](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso)
 - [Mate 22.3](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso)
 - [Xfce 22.3](https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-xfce-64bit.iso)
 
 ## Zorin OS
-<!-- Auto-updated: 2026-11-02 00:13 UTC -->
+<!-- Auto-updated: 2026-11-09 00:14 UTC -->
 - [Core 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Core-64-bit.iso)
 - [Lite 18](https://sourceforge.net/projects/zorin-os/files/18/Zorin-OS-18-Lite-64-bit.iso)
 
@@ -191,8 +191,8 @@ The following distributions are automatically updated with the latest versions:
 - [GNOME](https://channels.nixos.org/nixos-23.05/latest-nixos-gnome-x86_64-linux.iso)
 
 ## Alpine Linux
-<!-- Auto-updated: 2026-11-02 00:13 UTC -->
-- [Alpine 3.24.3](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-standard-3.24.3-x86_64.iso)
+<!-- Auto-updated: 2026-11-09 00:14 UTC -->
+- [Alpine 3.24.4](https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-standard-3.24.4-x86_64.iso)
 
 ## Endless OS
 - [Endless OS](https://images-dl.endlessm.com/torrents/eos-eos3.9-amd64-amd64.211103-113242.base.iso.torrent)
@@ -237,7 +237,7 @@ The following distributions are automatically updated with the latest versions:
 - [DragonFly BSD 6.4.0](https://mirror-master.dragonflybsd.org/iso-images/dfly-x86_64-6.4.0_REL.iso.bz2)
 
 ## FreeDOS
-<!-- Auto-updated: 2026-11-02 00:13 UTC -->
+<!-- Auto-updated: 2026-11-09 00:14 UTC -->
 - [FD14-LiveCD.zip](https://download.freedos.org/1.4/FD14-LiveCD.zip)
 - [FD14-BonusCD.zip](https://download.freedos.org/1.4/FD14-BonusCD.zip)
 - [FD14-FullUSB.zip](https://download.freedos.org/1.4/FD14-FullUSB.zip)
@@ -327,6 +327,33 @@ This repository is provided for informational purposes and adheres to the licens
 
 ## Fedora
 
+### Fedora 45 Workstation
+- [Fedora-Workstation-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Workstation/x86_64/iso/Fedora-Workstation-Live-45-1.4.x86_64.iso)
+
+### Fedora 45 Server
+- [Fedora-Server-dvd-x86_64-45-1.4.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Server/x86_64/iso/Fedora-Server-dvd-x86_64-45-1.4.iso)
+- [Fedora-Server-netinst-x86_64-45-1.4.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Server/x86_64/iso/Fedora-Server-netinst-x86_64-45-1.4.iso)
+
+### Fedora 45 Silverblue
+- [Fedora-Silverblue-Installer-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Silverblue/x86_64/iso/Fedora-Silverblue-Installer-45-1.4.x86_64.iso)
+
+### Fedora 45 Kinoite
+- [Fedora-Kinoite-Installer-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Kinoite/x86_64/iso/Fedora-Kinoite-Installer-45-1.4.x86_64.iso)
+
+### Fedora 45 Spins
+- [Fedora-Budgie-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-Budgie-Live-45-1.4.x86_64.iso)
+- [Fedora-COSMIC-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-COSMIC-Live-45-1.4.x86_64.iso)
+- [Fedora-Cinnamon-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-Cinnamon-Live-45-1.4.x86_64.iso)
+- [Fedora-KDE-Mobile-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-KDE-Mobile-Live-45-1.4.x86_64.iso)
+- [Fedora-LXDE-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-LXDE-Live-45-1.4.x86_64.iso)
+- [Fedora-LXQt-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-LXQt-Live-45-1.4.x86_64.iso)
+- [Fedora-MATE_Compiz-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-MATE_Compiz-Live-45-1.4.x86_64.iso)
+- [Fedora-MiracleWM-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-MiracleWM-Live-45-1.4.x86_64.iso)
+- [Fedora-SoaS-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-SoaS-Live-45-1.4.x86_64.iso)
+- [Fedora-Sway-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-Sway-Live-45-1.4.x86_64.iso)
+- [Fedora-Xfce-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-Xfce-Live-45-1.4.x86_64.iso)
+- [Fedora-i3-Live-45-1.4.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Spins/x86_64/iso/Fedora-i3-Live-45-1.4.x86_64.iso)
+
 ### Fedora 44 Workstation
 - [Fedora-Workstation-Live-44-1.7.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/44/Workstation/x86_64/iso/Fedora-Workstation-Live-44-1.7.x86_64.iso)
 
@@ -354,41 +381,14 @@ This repository is provided for informational purposes and adheres to the licens
 - [Fedora-Xfce-Live-44-1.7.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/44/Spins/x86_64/iso/Fedora-Xfce-Live-44-1.7.x86_64.iso)
 - [Fedora-i3-Live-44-1.7.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/44/Spins/x86_64/iso/Fedora-i3-Live-44-1.7.x86_64.iso)
 
-### Fedora 43 Workstation
-- [Fedora-Workstation-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Workstation/x86_64/iso/Fedora-Workstation-Live-43-1.6.x86_64.iso)
-
-### Fedora 43 Server
-- [Fedora-Server-dvd-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Server/x86_64/iso/Fedora-Server-dvd-x86_64-43-1.6.iso)
-- [Fedora-Server-netinst-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Server/x86_64/iso/Fedora-Server-netinst-x86_64-43-1.6.iso)
-
-### Fedora 43 Silverblue
-- [Fedora-Silverblue-ostree-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Silverblue/x86_64/iso/Fedora-Silverblue-ostree-x86_64-43-1.6.iso)
-
-### Fedora 43 Kinoite
-- [Fedora-Kinoite-ostree-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Kinoite/x86_64/iso/Fedora-Kinoite-ostree-x86_64-43-1.6.iso)
-
-### Fedora 43 Spins
-- [Fedora-Budgie-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Budgie-Live-43-1.6.x86_64.iso)
-- [Fedora-COSMIC-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-COSMIC-Live-43-1.6.x86_64.iso)
-- [Fedora-Cinnamon-Live-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Cinnamon-Live-x86_64-43-1.6.iso)
-- [Fedora-KDE-Mobile-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-KDE-Mobile-Live-43-1.6.x86_64.iso)
-- [Fedora-LXDE-Live-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-LXDE-Live-x86_64-43-1.6.iso)
-- [Fedora-LXQt-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-LXQt-Live-43-1.6.x86_64.iso)
-- [Fedora-MATE_Compiz-Live-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-MATE_Compiz-Live-x86_64-43-1.6.iso)
-- [Fedora-MiracleWM-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-MiracleWM-Live-43-1.6.x86_64.iso)
-- [Fedora-SoaS-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-SoaS-Live-43-1.6.x86_64.iso)
-- [Fedora-Sway-Live-x86_64-43-1.6.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Sway-Live-x86_64-43-1.6.iso)
-- [Fedora-Xfce-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-Xfce-Live-43-1.6.x86_64.iso)
-- [Fedora-i3-Live-43-1.6.x86_64.iso](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Spins/x86_64/iso/Fedora-i3-Live-43-1.6.x86_64.iso)
-
 
 ## Fedora Cloud
 
+### Fedora 45 Cloud Base
+- [Fedora-Cloud-Base-Generic-45-1.4.x86_64.qcow2](https://download.fedoraproject.org/pub/fedora/linux/releases/45/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-45-1.4.x86_64.qcow2)
+
 ### Fedora 44 Cloud Base
 - [Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2](https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2)
-
-### Fedora 43 Cloud Base
-- [Fedora-Cloud-Base-Generic-43-1.6.x86_64.qcow2](https://download.fedoraproject.org/pub/fedora/linux/releases/43/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-43-1.6.x86_64.qcow2)
 
 
 ## Debian Cloud
